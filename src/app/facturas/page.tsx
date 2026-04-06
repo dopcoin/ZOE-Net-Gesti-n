@@ -1,0 +1,9 @@
+import { createClient } from '@/lib/supabase/server';
+import FacturasClient from '@/components/shared/FacturasClient';
+
+export default async function FacturasPage() {
+  const supabase = await createClient();
+  const { data: facturas } = await supabase.from('facturas').select('*, clientes(nombre, apellido)').order('created_at', { ascending: false });
+  const { data: clientes } = await supabase.from('clientes').select('id, nombre, apellido').order('nombre');
+  return <FacturasClient facturas={facturas ?? []} clientes={clientes ?? []} />;
+}
