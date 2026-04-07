@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
@@ -39,22 +40,38 @@ export default function Sidebar() {
   const { profile } = useAuthStore();
   const { sidebarOpen, sidebarCollapsed, toggleCollapsed, setSidebarOpen } = useAppStore();
   const rol = profile?.rol || 'admin';
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [pathname, isMobile, setSidebarOpen]);
 
   const filtered = navItems.filter((item) => item.roles.includes(rol));
 
   return (
     <>
-      {sidebarOpen && (
+      {/* Mobile overlay */}
+      {sidebarOpen && isMobile && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
       <aside
         className={`fixed top-0 left-0 h-full bg-[#111827] border-r border-[#1F2937] z-50 transition-all duration-300 flex flex-col
           ${sidebarCollapsed ? 'w-16' : 'w-64'}
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
+        {/* Logo + collapse */}
         <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold text-white">
@@ -63,7 +80,7 @@ export default function Sidebar() {
           )}
           <button
             onClick={() => {
-              if (window.innerWidth < 1024) {
+              if (isMobile) {
                 setSidebarOpen(false);
               } else {
                 toggleCollapsed();
@@ -71,7 +88,7 @@ export default function Sidebar() {
             }}
             className="p-1 rounded hover:bg-[#1C2333] text-gray-400"
           >
-            {sidebarOpen && window.innerWidth < 1024 ? (
+            {sidebarOpen && isMobile ? (
               <X size={20} />
             ) : sidebarCollapsed ? (
               <ChevronRight size={20} />
@@ -81,6 +98,7 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
           {filtered.map((item) => {
             const active = pathname === item.href;
@@ -88,7 +106,6 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                   ${active
                     ? 'bg-blue-500/10 text-blue-400'
@@ -104,6 +121,7 @@ export default function Sidebar() {
           })}
         </nav>
 
+        {/* User info */}
         {!sidebarCollapsed && (
           <div className="p-4 border-t border-[#1F2937]">
             <div className="text-xs text-gray-500">

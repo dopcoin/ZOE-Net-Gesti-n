@@ -151,42 +151,48 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
     }));
   };
 
-  // --- Build payload with only valid DB columns ---
+  // --- Build payload with only valid DB columns (strip nulls and special types) ---
   const buildPayload = (): Record<string, unknown> => {
-    const payload: Record<string, unknown> = {
+    const raw: Record<string, unknown> = {
       nombre: formData.nombre,
-      apellido: formData.apellido,
+      apellido: formData.apellido || '',
       cedula: formData.cedula,
       telefono: formData.telefono,
       email: formData.email,
       direccion: formData.direccion,
-      localidad: formData.localidad,
+      localidad: formData.localidad || 'Sin localidad',
       plan: formData.plan,
-      monto_mensual: formData.monto_mensual,
-      estado: formData.estado,
+      monto_mensual: formData.monto_mensual || 0,
+      estado: formData.estado || 'activo',
       fecha_instalacion: formData.fecha_instalacion,
-      inscripcion: formData.inscripcion,
       nombre_red: formData.nombre_red,
       password_router: formData.password_router,
       password_antena: formData.password_antena,
       ip_asignada: formData.ip_asignada,
-      ip: formData.ip,
       ubicacion_gps: formData.ubicacion_gps,
-      ubicacion: formData.ubicacion,
-      coordenadas: formData.coordenadas,
       notas: formData.notas,
       tipo_pago: formData.tipo_pago,
-      tecnico_asignado: formData.tecnico_asignado,
       contrato_numero: formData.contrato_numero,
-      dias_gracia: formData.dias_gracia,
     };
+    // Clean: remove null/undefined values except required fields
+    const payload: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      if (val !== null && val !== undefined && val !== '') {
+        payload[key] = val;
+      }
+    }
+    // Always include required fields
+    payload.nombre = raw.nombre;
+    payload.localidad = raw.localidad;
+    payload.estado = raw.estado;
+    payload.monto_mensual = raw.monto_mensual;
     return payload;
   };
 
   // --- CRUD ---
   const handleSave = async () => {
-    if (!formData.nombre.trim() || !formData.apellido.trim()) {
-      toast.error('Nombre y apellido son obligatorios');
+    if (!formData.nombre.trim()) {
+      toast.error('El nombre es obligatorio');
       return;
     }
 

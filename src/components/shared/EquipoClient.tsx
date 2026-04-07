@@ -107,21 +107,29 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
 
+      if (!session?.access_token) {
+        toast.error('Sesión expirada. Por favor recarga la página.');
+        return;
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
       // Use Edge Function for secure user creation (uses service_role server-side)
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+        `${supabaseUrl}/functions/v1/create-user`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': supabaseKey || '',
           },
           body: JSON.stringify({
             email: form.email,
             password: form.password,
             nombre: form.nombre,
-            apellido: form.apellido,
+            apellido: form.apellido || '',
             rol: form.rol,
             equipo: form.equipo || null,
             telefono: form.telefono || null,
@@ -130,7 +138,9 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
       );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Error al crear usuario');
+      if (!response.ok) {
+        throw new Error(result.error || `Error ${response.status}: ${response.statusText}`);
+      }
 
       toast.success(`Usuario ${form.nombre} creado exitosamente`);
       setShowModal(false);
