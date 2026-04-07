@@ -29,9 +29,18 @@ interface ClienteOption {
   apellido: string;
 }
 
+interface TecnicoOption {
+  id: string;
+  nombre: string;
+  apellido: string;
+  equipo: string | null;
+  rol: string;
+}
+
 interface Props {
   instalaciones: Instalacion[];
   clientes: ClienteOption[];
+  tecnicos: TecnicoOption[];
 }
 
 const estadoLabels: Record<EstadoInstalacion, string> = {
@@ -55,7 +64,7 @@ const defaultForm = {
   descripcion_cobro: '',
 };
 
-export default function InstalacionesClient({ instalaciones: initial, clientes }: Props) {
+export default function InstalacionesClient({ instalaciones: initial, clientes, tecnicos }: Props) {
   const router = useRouter();
   const [instalaciones, setInstalaciones] = useState(initial);
   const [search, setSearch] = useState('');
@@ -388,13 +397,18 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
               </div>
               <div>
                 <label className="label">Tecnico Asignado</label>
-                <input
-                  type="text"
+                <select
                   value={form.tecnico_asignado}
                   onChange={(e) => setForm({ ...form, tecnico_asignado: e.target.value })}
                   className="input"
-                  placeholder="Nombre del tecnico"
-                />
+                >
+                  <option value="">— Sin asignar —</option>
+                  {tecnicos.map((t) => (
+                    <option key={t.id} value={`${t.nombre} ${t.apellido}`}>
+                      {t.nombre} {t.apellido}{t.equipo ? ` (${t.equipo})` : t.rol ? ` (${t.rol})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               {/* Cobro */}
               <div className="border-t border-[#1F2937] pt-3">

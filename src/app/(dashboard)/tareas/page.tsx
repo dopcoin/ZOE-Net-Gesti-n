@@ -7,6 +7,13 @@ export default async function TareasPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Get current user's role for permission checks
+  const { data: userProfile } = user ? await supabase
+    .from('profiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single() : { data: null };
+
   // IMPORTANT: Must use explicit FK name because tareas has TWO FKs to profiles
   // (asignado_a and creado_por). Without the hint, PostgREST returns error PGRST200.
   const { data: tareas, error: tareasError } = await supabase
@@ -36,6 +43,7 @@ export default async function TareasPage() {
       miembros={miembros ?? []}
       clientes={clientesData ?? []}
       userId={user?.id ?? null}
+      userRole={userProfile?.rol ?? null}
     />
   );
 }

@@ -28,6 +28,7 @@ interface Props {
   miembros: MiembroOption[];
   clientes: ClienteOption[];
   userId: string | null;
+  userRole: string | null;
 }
 
 const equipoLabels: Record<Equipo, string> = {
@@ -57,7 +58,7 @@ function isOverdue(fecha_limite: string | null, completada: boolean): boolean {
   return new Date(fecha_limite) < new Date(new Date().toDateString());
 }
 
-export default function TareasClient({ tareas: initial, miembros, clientes, userId }: Props) {
+export default function TareasClient({ tareas: initial, miembros, clientes, userId, userRole }: Props) {
   const router = useRouter();
   const [tareas, setTareas] = useState(initial);
   const [search, setSearch] = useState('');
@@ -200,7 +201,19 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
     }
   }
 
+  function canDeleteTarea(tarea: Tarea): boolean {
+    if (userRole === 'admin') return true;
+    if (userId && tarea.asignado_a === userId) return true;
+    if (userId && (tarea as Tarea & { creado_por?: string }).creado_por === userId) return true;
+    return false;
+  }
+
   async function handleDelete(id: string) {
+    const tarea = tareas.find((t) => t.id === id);
+    if (tarea && !canDeleteTarea(tarea)) {
+      toast.error('Solo el administrador o la persona asignada puede eliminar esta tarea');
+      return;
+    }
     if (!confirm('Eliminar esta tarea?')) return;
     const result = await deleteTarea(id);
     if (result.error) {
@@ -306,12 +319,14 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
                       </span>
                     </td>
                     <td className="table-cell">
-                      <button
-                        onClick={() => handleDelete(tarea.id)}
-                        className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors text-xs"
-                      >
-                        &#x2715;
-                      </button>
+                      {canDeleteTarea(tarea) ? (
+                        <button
+                          onClick={() => handleDelete(tarea.id)}
+                          className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors text-xs"
+                        >
+                          &#x2715;
+                        </button>
+                      ) : <span />}
                     </td>
                   </tr>
                 );

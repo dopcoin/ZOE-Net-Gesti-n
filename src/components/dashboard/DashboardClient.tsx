@@ -42,11 +42,11 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
   }, []);
 
   const kpis = [
-    { label: 'Total Clientes', value: stats.totalClientes, sub: `${stats.clientesActivos} activos`, icon: <Users size={20} />, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Cobros del Mes', value: `${stats.cobrosPagados}/${stats.totalCobros}`, sub: formatCurrency(stats.totalRecaudado), icon: <CreditCard size={20} />, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'Instalaciones Pend.', value: stats.instalacionesPendientes, sub: 'pendientes', icon: <Wrench size={20} />, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
-    { label: 'Tareas Pendientes', value: stats.tareasPendientes, sub: 'sin completar', icon: <CheckSquare size={20} />, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'Ventas del Mes', value: formatCurrency(stats.totalVentas), sub: 'en ventas', icon: <ShoppingCart size={20} />, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    { label: 'Total Clientes', value: stats.totalClientes, sub: `${stats.clientesActivos} activos`, icon: <Users size={20} />, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/clientes' },
+    { label: 'Cobros del Mes', value: `${stats.cobrosPagados}/${stats.totalCobros}`, sub: formatCurrency(stats.totalRecaudado), icon: <CreditCard size={20} />, color: 'text-emerald-400', bg: 'bg-emerald-500/10', href: '/cobros' },
+    { label: 'Instalaciones Pend.', value: stats.instalacionesPendientes, sub: 'pendientes', icon: <Wrench size={20} />, color: 'text-yellow-400', bg: 'bg-yellow-500/10', href: '/instalaciones' },
+    { label: 'Tareas Pendientes', value: stats.tareasPendientes, sub: 'sin completar', icon: <CheckSquare size={20} />, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/tareas' },
+    { label: 'Ventas del Mes', value: formatCurrency(stats.totalVentas), sub: 'en ventas', icon: <ShoppingCart size={20} />, color: 'text-cyan-400', bg: 'bg-cyan-500/10', href: '/ventas' },
   ];
 
   return (
@@ -60,16 +60,16 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="stat-card">
+          <Link key={kpi.label} href={kpi.href} className="stat-card hover:bg-[#1C2333] hover:border-[#2A3142] transition-colors cursor-pointer group">
             <div className="flex items-center justify-between">
               <span className="stat-label">{kpi.label}</span>
-              <div className={`p-2 rounded-lg ${kpi.bg}`}>
+              <div className={`p-2 rounded-lg ${kpi.bg} group-hover:scale-110 transition-transform`}>
                 <span className={kpi.color}>{kpi.icon}</span>
               </div>
             </div>
             <div className="stat-value">{kpi.value}</div>
             <div className="text-xs text-gray-500">{kpi.sub}</div>
-          </div>
+          </Link>
         ))}
       </div>
 
