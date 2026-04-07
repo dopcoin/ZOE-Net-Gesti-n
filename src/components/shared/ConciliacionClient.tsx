@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Conciliacion } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { createConciliacion, getErrorMessage } from '@/lib/services';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
 import { Plus, X, ClipboardCheck, AlertTriangle } from 'lucide-react';
@@ -64,6 +65,21 @@ export default function ConciliacionClient({
     setModalOpen(false);
   };
 
+  // Escape key handler and body overflow cleanup
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (modalOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [modalOpen]);
+
   const handleMercanciaChange = (id: string) => {
     const product = mercancia.find((m) => m.id === id);
     setFormData((prev) => ({
@@ -80,32 +96,28 @@ export default function ConciliacionClient({
     }
 
     setLoading(true);
-    try {
-      const payload = {
-        mercancia_id: formData.mercancia_id,
-        stock_sistema: formData.stock_sistema,
-        stock_fisico: formData.stock_fisico,
-        diferencia,
-        revendedor_id: formData.revendedor_id || null,
-        notas: formData.notas || null,
-      };
+    const payload = {
+      mercancia_id: formData.mercancia_id,
+      stock_sistema: formData.stock_sistema,
+      stock_fisico: formData.stock_fisico,
+      cantidad_esperada: formData.stock_sistema,
+      cantidad_real: formData.stock_fisico,
+      diferencia,
+      revendedor_id: formData.revendedor_id || null,
+      notas: formData.notas || null,
+    };
 
-      const { data, error } = await supabase
-        .from('conciliacion')
-        .insert([payload])
-        .select('*, mercancia(nombre), revendedores(nombre, apellido)')
-        .single();
-      if (error) throw error;
-      setConciliaciones((prev) => [data, ...prev]);
-      toast.success('Conciliacion registrada');
-      closeModal();
-      router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar';
-      toast.error(message);
-    } finally {
+    const result = await createConciliacion(payload);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
       setLoading(false);
+      return;
     }
+
+    toast.success('Conciliacion registrada');
+    closeModal();
+    router.refresh();
+    setLoading(false);
   };
 
   const handleDelete = async (id: string) => {

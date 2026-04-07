@@ -1,6 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import {
+  createRevendedor, updateRevendedor, deleteRevendedor,
+  createGananciaManual, marcarGananciaPagada, getErrorMessage,
+} from '@/lib/services';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -49,6 +53,36 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
   const [gananciaForm, setGananciaForm] = useState({ revendedor_id: '', monto: 0, notas: '' });
 
   const [loading, setLoading] = useState(false);
+
+  // Escape key handler and body overflow cleanup for main modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowModal(false);
+    };
+    if (showModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [showModal]);
+
+  // Escape key handler and body overflow cleanup for ganancia modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowGananciaModal(false);
+    };
+    if (showGananciaModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [showGananciaModal]);
 
   // --- Helpers ---
   const filtered = <T,>(list: T[], keys: string[]) =>
@@ -126,45 +160,70 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
     };
 
     if (editingId) {
-      const { data, error } = await supabase.from('revendedores').update(payload).eq('id', editingId).select().single();
-      if (error) { toast.error(error.message); setLoading(false); return; }
-      setRevendedores((prev) => prev.map((r) => (r.id === editingId ? data : r)));
+      const result = await updateRevendedor(editingId, payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
+      }
+      // Re-fetch the updated record for local state
+      const { data } = await supabase.from('revendedores').select().eq('id', editingId).single();
+      if (data) setRevendedores((prev) => prev.map((r) => (r.id === editingId ? data : r)));
       toast.success('Revendedor actualizado');
     } else {
-      const { data, error } = await supabase.from('revendedores').insert(payload).select().single();
-      if (error) { toast.error(error.message); setLoading(false); return; }
-      setRevendedores((prev) => [...prev, data]);
+      const result = await createRevendedor(payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
+      }
+      // Re-fetch the latest record for local state
+      const { data } = await supabase.from('revendedores').select().order('created_at', { ascending: false }).limit(1).single();
+      if (data) setRevendedores((prev) => [...prev, data]);
       toast.success('Revendedor creado');
     }
     setShowModal(false);
     setLoading(false);
   }
 
-  async function deleteRevendedor(id: string) {
+  async function handleDeleteRevendedor(id: string) {
     if (!confirm('Eliminar este revendedor?')) return;
-    const { error } = await supabase.from('revendedores').delete().eq('id', id);
-    if (error) { toast.error(error.message); return; }
+    const result = await deleteRevendedor(id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
+    }
     setRevendedores((prev) => prev.filter((r) => r.id !== id));
     toast.success('Revendedor eliminado');
   }
 
   async function toggleActivo(r: Revendedor) {
-    const { data, error } = await supabase.from('revendedores').update({ activo: !r.activo }).eq('id', r.id).select().single();
-    if (error) { toast.error(error.message); return; }
-    setRevendedores((prev) => prev.map((x) => (x.id === r.id ? data : x)));
-    toast.success(data.activo ? 'Revendedor activado' : 'Revendedor desactivado');
+    const result = await updateRevendedor(r.id, { activo: !r.activo });
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
+    }
+    const { data } = await supabase.from('revendedores').select().eq('id', r.id).single();
+    if (data) {
+      setRevendedores((prev) => prev.map((x) => (x.id === r.id ? data : x)));
+      toast.success(data.activo ? 'Revendedor activado' : 'Revendedor desactivado');
+    }
   }
 
   // --- Ganancias ---
-  async function marcarPagado(g: GananciaRevendedor) {
-    const { data, error } = await supabase
+  async function handleMarcarPagado(g: GananciaRevendedor) {
+    const result = await marcarGananciaPagada(g.id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
+    }
+    // Re-fetch updated ganancia for local state
+    const { data } = await supabase
       .from('ganancias_revendedores')
-      .update({ pagado: true, fecha_pago: new Date().toISOString() })
-      .eq('id', g.id)
       .select('*, revendedores(nombre, apellido), ventas(*)')
+      .eq('id', g.id)
       .single();
-    if (error) { toast.error(error.message); return; }
-    setGanancias((prev) => prev.map((x) => (x.id === g.id ? data : x)));
+    if (data) setGanancias((prev) => prev.map((x) => (x.id === g.id ? data : x)));
     toast.success('Ganancia marcada como pagada');
   }
 
@@ -174,19 +233,28 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
+    const payload = {
+      revendedor_id: gananciaForm.revendedor_id,
+      monto: gananciaForm.monto,
+      tipo: 'manual',
+      pagado: false,
+      estado: 'pendiente',
+      notas: gananciaForm.notas.trim() || null,
+    };
+    const result = await createGananciaManual(payload);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      setLoading(false);
+      return;
+    }
+    // Re-fetch the latest ganancia for local state
+    const { data } = await supabase
       .from('ganancias_revendedores')
-      .insert({
-        revendedor_id: gananciaForm.revendedor_id,
-        monto: gananciaForm.monto,
-        tipo: 'manual',
-        pagado: false,
-        notas: gananciaForm.notas.trim() || null,
-      })
       .select('*, revendedores(nombre, apellido), ventas(*)')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
-    if (error) { toast.error(error.message); setLoading(false); return; }
-    setGanancias((prev) => [data, ...prev]);
+    if (data) setGanancias((prev) => [data, ...prev]);
     setShowGananciaModal(false);
     setGananciaForm({ revendedor_id: '', monto: 0, notas: '' });
     setLoading(false);
@@ -364,7 +432,7 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
                           <button onClick={() => openEdit(r)} className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-blue-400 transition-colors">
                             <Edit2 size={14} />
                           </button>
-                          <button onClick={() => deleteRevendedor(r.id)} className="p-1.5 rounded hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors">
+                          <button onClick={() => handleDeleteRevendedor(r.id)} className="p-1.5 rounded hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -415,7 +483,7 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
                       </span>
                     ) : (
                       <button
-                        onClick={() => marcarPagado(g)}
+                        onClick={() => handleMarcarPagado(g)}
                         className="btn-primary text-xs flex items-center gap-1"
                       >
                         <Check size={14} /> Marcar pagado

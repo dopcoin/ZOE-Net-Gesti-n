@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
@@ -57,6 +57,17 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
   const [editForm, setEditForm] = useState({ nombre: '', apellido: '', rol: 'soporte' as Rol, equipo: '' as Equipo | '', telefono: '', activo: true });
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setShowModal(false); setShowEditModal(false); }
+    };
+    if (showModal || showEditModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.removeEventListener('keydown', handleEscape); document.body.style.overflow = ''; };
+  }, [showModal, showEditModal]);
+
   const filtered = miembros.filter((m) => {
     const matchEquipo = equipoFilter === 'todos' || m.equipo === equipoFilter;
     const term = search.toLowerCase();
@@ -94,40 +105,32 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
     setLoading(true);
     try {
       const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // Sign up new user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            nombre: form.nombre,
-            apellido: form.apellido,
-            rol: form.rol,
+      // Use Edge Function for secure user creation (uses service_role server-side)
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
           },
-        },
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Update the profile that was auto-created by the trigger
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
             nombre: form.nombre,
             apellido: form.apellido,
             rol: form.rol,
             equipo: form.equipo || null,
             telefono: form.telefono || null,
-            email: form.email,
-          })
-          .eq('id', authData.user.id);
-
-        if (profileError) {
-          console.error('Profile update error:', profileError);
+          }),
         }
-      }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Error al crear usuario');
 
       toast.success(`Usuario ${form.nombre} creado exitosamente`);
       setShowModal(false);

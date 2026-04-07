@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createTarea, updateTarea, deleteTarea, toggleTarea, getErrorMessage } from '@/lib/services';
 import { formatDate, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, X, CheckSquare, Square, AlertTriangle } from 'lucide-react';
-import type { Tarea, Equipo, Prioridad } from '@/types';
+import type { Tarea, Equipo, Prioridad, Profile } from '@/types';
 
 interface MiembroOption {
   id: string;
@@ -16,7 +16,7 @@ interface MiembroOption {
 }
 
 interface Props {
-  tareas: Tarea[];
+  tareas: (Tarea & { profiles?: Profile })[];
   miembros: MiembroOption[];
 }
 
@@ -58,13 +58,40 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
 
   const equipos: Equipo[] = ['soporte', 'financiero', 'administrativo'];
 
+  // Sync with server data when props change
+  useEffect(() => {
+    setTareas(initial);
+  }, [initial]);
+
+  // Modal: Escape key handler + body overflow cleanup
+  const closeModal = useCallback(() => {
+    setShowModal(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showModal) return;
+
+    document.body.style.overflow = 'hidden';
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showModal, closeModal]);
+
   const filtered = tareas.filter((t) => {
     const matchEquipo = filtroEquipo === 'todos' || t.equipo === filtroEquipo;
     const matchSearch =
       search === '' ||
       t.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      (t.descripcion ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (t.profiles?.nombre ?? '').toLowerCase().includes(search.toLowerCase());
+      (t.descripcion ?? '').toLowerCase().includes(search.toLowerCase());
     return matchEquipo && matchSearch;
   });
 
@@ -91,12 +118,12 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
 
   async function handleSave() {
     if (!form.titulo.trim()) {
-      toast.error('El título es requerido');
+      toast.error('El titulo es requerido');
       return;
     }
     setLoading(true);
-    const supabase = createClient();
-    const payload = {
+
+    const payload: Record<string, unknown> = {
       titulo: form.titulo,
       descripcion: form.descripcion || null,
       equipo: form.equipo,
@@ -106,21 +133,28 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
     };
 
     if (editing) {
-      const { error } = await supabase.from('tareas').update(payload).eq('id', editing.id);
-      if (error) {
-        toast.error('Error al actualizar: ' + error.message);
+      const result = await updateTarea(editing.id, payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
       } else {
         toast.success('Tarea actualizada');
-        setShowModal(false);
+        closeModal();
         router.refresh();
       }
     } else {
-      const { error } = await supabase.from('tareas').insert({ ...payload, completada: false });
-      if (error) {
-        toast.error('Error al crear: ' + error.message);
+      // Include backwards compat fields on insert
+      const insertPayload: Record<string, unknown> = {
+        ...payload,
+        tipo_equipo: form.equipo,
+        completada: false,
+        estado: 'pendiente',
+      };
+      const result = await createTarea(insertPayload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
       } else {
         toast.success('Tarea creada');
-        setShowModal(false);
+        closeModal();
         router.refresh();
       }
     }
@@ -128,27 +162,23 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
   }
 
   async function handleToggle(tarea: Tarea) {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('tareas')
-      .update({ completada: !tarea.completada })
-      .eq('id', tarea.id);
-    if (error) {
-      toast.error('Error al actualizar: ' + error.message);
+    const newValue = !tarea.completada;
+    const result = await toggleTarea(tarea.id, newValue);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
     } else {
       setTareas((prev) =>
-        prev.map((t) => (t.id === tarea.id ? { ...t, completada: !t.completada } : t))
+        prev.map((t) => (t.id === tarea.id ? { ...t, completada: newValue } : t))
       );
-      toast.success(tarea.completada ? 'Tarea marcada como pendiente' : 'Tarea completada');
+      toast.success(newValue ? 'Tarea completada' : 'Tarea marcada como pendiente');
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar esta tarea?')) return;
-    const supabase = createClient();
-    const { error } = await supabase.from('tareas').delete().eq('id', id);
-    if (error) {
-      toast.error('Error al eliminar: ' + error.message);
+    if (!confirm('Eliminar esta tarea?')) return;
+    const result = await deleteTarea(id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
     } else {
       toast.success('Tarea eliminada');
       setTareas((prev) => prev.filter((t) => t.id !== id));
@@ -178,10 +208,10 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
             <thead>
               <tr className="border-b border-[#1F2937]">
                 <th className="table-header w-10"></th>
-                <th className="table-header">Título</th>
+                <th className="table-header">Titulo</th>
                 <th className="table-header">Asignado</th>
                 <th className="table-header">Prioridad</th>
-                <th className="table-header">Fecha Límite</th>
+                <th className="table-header">Fecha Limite</th>
                 <th className="table-header w-10"></th>
               </tr>
             </thead>
@@ -230,7 +260,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                     <td className="table-cell">
                       {tarea.profiles
                         ? `${tarea.profiles.nombre} ${tarea.profiles.apellido}`
-                        : '—'}
+                        : '\u2014'}
                     </td>
                     <td className="table-cell">
                       <span className={`badge ${prioridadColor(tarea.prioridad)}`}>
@@ -247,7 +277,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                         onClick={() => handleDelete(tarea.id)}
                         className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors text-xs"
                       >
-                        ✕
+                        &#x2715;
                       </button>
                     </td>
                   </tr>
@@ -301,7 +331,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
-          placeholder="Buscar por título, descripción, asignado..."
+          placeholder="Buscar por titulo, descripcion..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="input pl-9"
@@ -315,34 +345,43 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={closeModal}
+        >
+          <div
+            className="modal-content max-w-lg w-full bg-[#111827] border border-[#1F2937] rounded-lg shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
               <h2 className="text-lg font-semibold text-white">
                 {editing ? 'Editar Tarea' : 'Nueva Tarea'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
+              <button
+                onClick={closeModal}
+                className="p-1 rounded hover:bg-[#2A3142] text-gray-400"
+              >
                 <X size={18} />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="label">Título *</label>
+                <label className="label">Titulo *</label>
                 <input
                   type="text"
                   value={form.titulo}
                   onChange={(e) => setForm({ ...form, titulo: e.target.value })}
                   className="input"
-                  placeholder="Título de la tarea"
+                  placeholder="Titulo de la tarea"
                 />
               </div>
               <div>
-                <label className="label">Descripción</label>
+                <label className="label">Descripcion</label>
                 <textarea
                   value={form.descripcion}
                   onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                   className="input min-h-[80px]"
-                  placeholder="Descripción opcional..."
+                  placeholder="Descripcion opcional..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -350,7 +389,9 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                   <label className="label">Equipo</label>
                   <select
                     value={form.equipo}
-                    onChange={(e) => setForm({ ...form, equipo: e.target.value as Equipo, asignado_a: '' })}
+                    onChange={(e) =>
+                      setForm({ ...form, equipo: e.target.value as Equipo, asignado_a: '' })
+                    }
                     className="input"
                   >
                     <option value="soporte">Soporte</option>
@@ -379,7 +420,9 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                   <label className="label">Prioridad</label>
                   <select
                     value={form.prioridad}
-                    onChange={(e) => setForm({ ...form, prioridad: e.target.value as Prioridad })}
+                    onChange={(e) =>
+                      setForm({ ...form, prioridad: e.target.value as Prioridad })
+                    }
                     className="input"
                   >
                     <option value="baja">Baja</option>
@@ -389,7 +432,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="label">Fecha Límite</label>
+                  <label className="label">Fecha Limite</label>
                   <input
                     type="date"
                     value={form.fecha_limite}
@@ -400,7 +443,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 p-4 border-t border-[#1F2937]">
-              <button onClick={() => setShowModal(false)} className="btn-secondary">
+              <button onClick={closeModal} className="btn-secondary">
                 Cancelar
               </button>
               <button onClick={handleSave} disabled={loading} className="btn-primary">

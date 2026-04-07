@@ -1,34 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Cliente, EstadoCliente } from '@/types';
-import { createClient } from '@/lib/supabase/client';
+import { createCliente, updateCliente, deleteCliente, getErrorMessage } from '@/lib/services';
 import { formatCurrency, formatDate, estadoClienteColor } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, Eye, X, Users } from 'lucide-react';
 
 const ESTADOS: EstadoCliente[] = ['activo', 'inactivo', 'nuevo', 'becado', 'suspendido'];
 
-const emptyForm: Omit<Cliente, 'id' | 'created_at' | 'updated_at'> = {
+// Only DB-valid columns (excluding id, created_at, updated_at which are auto-managed)
+const emptyForm = {
   nombre: '',
   apellido: '',
-  cedula: null,
-  telefono: null,
-  email: null,
-  direccion: null,
-  localidad: null,
-  plan: null,
+  cedula: null as string | null,
+  telefono: null as string | null,
+  email: null as string | null,
+  direccion: null as string | null,
+  localidad: null as string | null,
+  plan: null as string | null,
   monto_mensual: 0,
-  estado: 'nuevo',
-  fecha_instalacion: null,
-  nombre_red: null,
-  password_router: null,
-  password_antena: null,
-  ip_asignada: null,
-  ubicacion_gps: null,
-  notas: null,
+  estado: 'nuevo' as EstadoCliente,
+  fecha_instalacion: null as string | null,
+  inscripcion: null as string | null,
+  nombre_red: null as string | null,
+  password_router: null as string | null,
+  password_antena: null as string | null,
+  ip_asignada: null as string | null,
+  ip: null as string | null,
+  ubicacion_gps: null as string | null,
+  ubicacion: null as string | null,
+  coordenadas: null as string | null,
+  notas: null as string | null,
+  tipo_pago: null as string | null,
+  tecnico_asignado: null as string | null,
+  contrato_numero: null as string | null,
+  dias_gracia: null as number | null,
 };
+
+type FormData = typeof emptyForm;
 
 interface Props {
   clientes: Cliente[];
@@ -36,7 +47,6 @@ interface Props {
 
 export default function ClientesClient({ clientes: initialClientes }: Props) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
   const [search, setSearch] = useState('');
@@ -44,9 +54,31 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'tecnico' | 'notas'>('general');
+
+  // --- Modal UX: Escape key + body overflow ---
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setSelectedCliente(null);
+  }, []);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [modalOpen, closeModal]);
 
   // --- Filtering ---
   const filtered = clientes.filter((c) => {
@@ -86,21 +118,24 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
       monto_mensual: cliente.monto_mensual,
       estado: cliente.estado,
       fecha_instalacion: cliente.fecha_instalacion,
+      inscripcion: (cliente as unknown as Record<string, unknown>).inscripcion as string | null ?? null,
       nombre_red: cliente.nombre_red,
       password_router: cliente.password_router,
       password_antena: cliente.password_antena,
       ip_asignada: cliente.ip_asignada,
+      ip: (cliente as unknown as Record<string, unknown>).ip as string | null ?? null,
       ubicacion_gps: cliente.ubicacion_gps,
+      ubicacion: (cliente as unknown as Record<string, unknown>).ubicacion as string | null ?? null,
+      coordenadas: (cliente as unknown as Record<string, unknown>).coordenadas as string | null ?? null,
       notas: cliente.notas,
+      tipo_pago: (cliente as unknown as Record<string, unknown>).tipo_pago as string | null ?? null,
+      tecnico_asignado: (cliente as unknown as Record<string, unknown>).tecnico_asignado as string | null ?? null,
+      contrato_numero: (cliente as unknown as Record<string, unknown>).contrato_numero as string | null ?? null,
+      dias_gracia: (cliente as unknown as Record<string, unknown>).dias_gracia as number | null ?? null,
     });
     setModalMode('edit');
     setActiveTab('general');
     setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedCliente(null);
   };
 
   const handleChange = (
@@ -109,8 +144,43 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'monto_mensual' ? Number(value) : value || null,
+      [name]:
+        name === 'monto_mensual' || name === 'dias_gracia'
+          ? value === '' ? null : Number(value)
+          : value || null,
     }));
+  };
+
+  // --- Build payload with only valid DB columns ---
+  const buildPayload = (): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      nombre: formData.nombre,
+      apellido: formData.apellido,
+      cedula: formData.cedula,
+      telefono: formData.telefono,
+      email: formData.email,
+      direccion: formData.direccion,
+      localidad: formData.localidad,
+      plan: formData.plan,
+      monto_mensual: formData.monto_mensual,
+      estado: formData.estado,
+      fecha_instalacion: formData.fecha_instalacion,
+      inscripcion: formData.inscripcion,
+      nombre_red: formData.nombre_red,
+      password_router: formData.password_router,
+      password_antena: formData.password_antena,
+      ip_asignada: formData.ip_asignada,
+      ip: formData.ip,
+      ubicacion_gps: formData.ubicacion_gps,
+      ubicacion: formData.ubicacion,
+      coordenadas: formData.coordenadas,
+      notas: formData.notas,
+      tipo_pago: formData.tipo_pago,
+      tecnico_asignado: formData.tecnico_asignado,
+      contrato_numero: formData.contrato_numero,
+      dias_gracia: formData.dias_gracia,
+    };
+    return payload;
   };
 
   // --- CRUD ---
@@ -122,31 +192,25 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
 
     setLoading(true);
     try {
+      const payload = buildPayload();
+
       if (modalMode === 'create') {
-        const { data, error } = await supabase
-          .from('clientes')
-          .insert([formData])
-          .select()
-          .single();
-        if (error) throw error;
-        setClientes((prev) => [data, ...prev]);
+        const result = await createCliente(payload);
+        if (result.error) {
+          toast.error(getErrorMessage(result.error));
+          return;
+        }
         toast.success('Cliente creado exitosamente');
       } else if (selectedCliente) {
-        const { data, error } = await supabase
-          .from('clientes')
-          .update(formData)
-          .eq('id', selectedCliente.id)
-          .select()
-          .single();
-        if (error) throw error;
-        setClientes((prev) => prev.map((c) => (c.id === data.id ? data : c)));
+        const result = await updateCliente(selectedCliente.id, payload);
+        if (result.error) {
+          toast.error(getErrorMessage(result.error));
+          return;
+        }
         toast.success('Cliente actualizado exitosamente');
       }
       closeModal();
       router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar';
-      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -160,14 +224,14 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('clientes').delete().eq('id', cliente.id);
-      if (error) throw error;
+      const result = await deleteCliente(cliente.id);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        return;
+      }
       setClientes((prev) => prev.filter((c) => c.id !== cliente.id));
       toast.success('Cliente eliminado');
       router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al eliminar';
-      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -294,9 +358,12 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={closeModal}
+        >
           <div
-            className="modal-content w-full max-w-2xl"
+            className="modal-content w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}

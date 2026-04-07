@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createVenta, getErrorMessage } from '@/lib/services';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, X, ShoppingCart, AlertTriangle } from 'lucide-react';
@@ -85,10 +86,29 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
     });
   }
 
+  function closeModal() {
+    setShowModal(false);
+  }
+
   function openCreate() {
     setForm(defaultForm);
     setShowModal(true);
   }
+
+  // Escape key handler and body overflow cleanup
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (showModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [showModal]);
 
   async function handleSave() {
     if (!form.mercancia_id) {
@@ -114,7 +134,6 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
     }
 
     setLoading(true);
-    const supabase = createClient();
 
     const total = form.cantidad * form.precio_unitario;
     const ganancia = selectedProduct
@@ -125,6 +144,7 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
       mercancia_id: form.mercancia_id,
       cantidad: form.cantidad,
       precio_unitario: form.precio_unitario,
+      precio_compra_unitario: selectedProduct ? selectedProduct.precio_compra : 0,
       total,
       ganancia,
       tipo: form.tipo,
@@ -134,21 +154,24 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
       notas: form.notas || null,
     };
 
-    const { error } = await supabase.from('ventas').insert(payload);
-    if (error) {
-      toast.error('Error al crear venta: ' + error.message);
-    } else {
-      // Update stock locally
-      if (selectedProduct) {
-        await supabase
-          .from('mercancia')
-          .update({ stock: selectedProduct.stock - form.cantidad })
-          .eq('id', form.mercancia_id);
-      }
-      toast.success('Venta registrada');
-      setShowModal(false);
-      router.refresh();
+    const result = await createVenta(payload);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      setLoading(false);
+      return;
     }
+
+    // Update stock locally
+    if (selectedProduct) {
+      const supabase = createClient();
+      await supabase
+        .from('mercancia')
+        .update({ stock: selectedProduct.stock - form.cantidad })
+        .eq('id', form.mercancia_id);
+    }
+    toast.success('Venta registrada');
+    setShowModal(false);
+    router.refresh();
     setLoading(false);
   }
 
@@ -181,7 +204,7 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
           <span className="stat-value text-cyan-400">{formatCurrency(gananciaNeta)}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Vía Revendedor</span>
+          <span className="stat-label">Via Revendedor</span>
           <span className="stat-value">{ventasRevendedor}</span>
         </div>
       </div>
@@ -292,11 +315,11 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
               <h2 className="text-lg font-semibold text-white">Nueva Venta</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
+              <button onClick={closeModal} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
                 <X size={18} />
               </button>
             </div>
@@ -419,7 +442,7 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 p-4 border-t border-[#1F2937]">
-              <button onClick={() => setShowModal(false)} className="btn-secondary">
+              <button onClick={closeModal} className="btn-secondary">
                 Cancelar
               </button>
               <button onClick={handleSave} disabled={loading} className="btn-primary">

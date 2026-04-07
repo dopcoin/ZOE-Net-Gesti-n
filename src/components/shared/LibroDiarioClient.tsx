@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LibroDiario, TipoMovimiento } from '@/types';
-import { createClient } from '@/lib/supabase/client';
+import { createRegistroDiario, updateRegistroDiario, deleteRegistroDiario, getErrorMessage } from '@/lib/services';
 import { toast } from 'sonner';
 import {
   formatCurrency,
@@ -27,7 +27,6 @@ const emptyForm = {
 
 export default function LibroDiarioClient({ registros: initial }: Props) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [registros, setRegistros] = useState<LibroDiario[]>(initial);
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,6 +71,21 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
     setSelectedRegistro(null);
   };
 
+  // Escape key handler and body overflow cleanup
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (modalOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [modalOpen]);
+
   const handleSave = async () => {
     if (!formData.categoria || !formData.descripcion.trim() || formData.monto <= 0) {
       toast.error('Completa todos los campos obligatorios');
@@ -79,57 +93,46 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
     }
 
     setLoading(true);
-    try {
-      const payload = {
-        tipo: formData.tipo,
-        categoria: formData.categoria,
-        descripcion: formData.descripcion,
-        monto: formData.monto,
-        referencia: formData.referencia || null,
-      };
+    const payload = {
+      tipo: formData.tipo,
+      categoria: formData.categoria,
+      descripcion: formData.descripcion,
+      monto: formData.monto,
+      referencia: formData.referencia || null,
+    };
 
-      if (modalMode === 'create') {
-        const { data, error } = await supabase
-          .from('libro_diario')
-          .insert([payload])
-          .select()
-          .single();
-        if (error) throw error;
-        setRegistros((prev) => [data, ...prev]);
-        toast.success('Registro creado exitosamente');
-      } else if (selectedRegistro) {
-        const { data, error } = await supabase
-          .from('libro_diario')
-          .update(payload)
-          .eq('id', selectedRegistro.id)
-          .select()
-          .single();
-        if (error) throw error;
-        setRegistros((prev) => prev.map((r) => (r.id === data.id ? data : r)));
-        toast.success('Registro actualizado exitosamente');
+    if (modalMode === 'create') {
+      const result = await createRegistroDiario(payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
       }
-      closeModal();
-      router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar';
-      toast.error(message);
-    } finally {
-      setLoading(false);
+      toast.success('Registro creado exitosamente');
+    } else if (selectedRegistro) {
+      const result = await updateRegistroDiario(selectedRegistro.id, payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
+      }
+      toast.success('Registro actualizado exitosamente');
     }
+    closeModal();
+    router.refresh();
+    setLoading(false);
   };
 
   const handleDelete = async (registro: LibroDiario) => {
     if (!window.confirm('¿Eliminar este registro?')) return;
-    try {
-      const { error } = await supabase.from('libro_diario').delete().eq('id', registro.id);
-      if (error) throw error;
-      setRegistros((prev) => prev.filter((r) => r.id !== registro.id));
-      toast.success('Registro eliminado');
-      router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al eliminar';
-      toast.error(message);
+    const result = await deleteRegistroDiario(registro.id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
     }
+    setRegistros((prev) => prev.filter((r) => r.id !== registro.id));
+    toast.success('Registro eliminado');
+    router.refresh();
   };
 
   const balancePercent =

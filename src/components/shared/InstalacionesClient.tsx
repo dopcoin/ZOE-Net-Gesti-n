@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
 import { formatDate, estadoInstalacionColor, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, X, Wrench } from 'lucide-react';
@@ -80,6 +80,25 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
     return matchEstado && matchSearch;
   });
 
+  function closeModal() {
+    setShowModal(false);
+  }
+
+  // Escape key handler and body overflow cleanup
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (showModal) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [showModal]);
+
   function openCreate() {
     setEditing(null);
     setForm(defaultForm);
@@ -103,11 +122,10 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
 
   async function handleSave() {
     if (!form.cliente_id || !form.direccion) {
-      toast.error('Cliente y dirección son requeridos');
+      toast.error('Cliente y direccion son requeridos');
       return;
     }
     setLoading(true);
-    const supabase = createClient();
     const payload = {
       cliente_id: form.cliente_id,
       tipo: form.tipo,
@@ -120,38 +138,37 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
     };
 
     if (editing) {
-      const { error } = await supabase.from('instalaciones').update(payload).eq('id', editing.id);
-      if (error) {
-        toast.error('Error al actualizar: ' + error.message);
-      } else {
-        toast.success('Instalación actualizada');
-        setShowModal(false);
-        router.refresh();
+      const result = await updateInstalacion(editing.id, payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
       }
+      toast.success('Instalacion actualizada');
     } else {
-      const { error } = await supabase.from('instalaciones').insert(payload);
-      if (error) {
-        toast.error('Error al crear: ' + error.message);
-      } else {
-        toast.success('Instalación creada');
-        setShowModal(false);
-        router.refresh();
+      const result = await createInstalacion(payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
       }
+      toast.success('Instalacion creada');
     }
+    setShowModal(false);
+    router.refresh();
     setLoading(false);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar esta instalación?')) return;
-    const supabase = createClient();
-    const { error } = await supabase.from('instalaciones').delete().eq('id', id);
-    if (error) {
-      toast.error('Error al eliminar: ' + error.message);
-    } else {
-      toast.success('Instalación eliminada');
-      setInstalaciones((prev) => prev.filter((i) => i.id !== id));
-      router.refresh();
+    if (!confirm('¿Eliminar esta instalacion?')) return;
+    const result = await deleteInstalacion(id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
     }
+    toast.success('Instalacion eliminada');
+    setInstalaciones((prev) => prev.filter((i) => i.id !== id));
+    router.refresh();
   }
 
   return (
@@ -164,7 +181,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
         </div>
         <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <Plus size={16} />
-          Nueva Instalación
+          Nueva Instalacion
         </button>
       </div>
 
@@ -191,7 +208,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
-          placeholder="Buscar por cliente, dirección, técnico..."
+          placeholder="Buscar por cliente, direccion, tecnico..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="input pl-9"
@@ -205,7 +222,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
             <tr className="border-b border-[#1F2937]">
               <th className="table-header">Cliente</th>
               <th className="table-header">Tipo</th>
-              <th className="table-header">Dirección</th>
+              <th className="table-header">Direccion</th>
               <th className="table-header">Prioridad</th>
               <th className="table-header">Estado</th>
               <th className="table-header">Fecha</th>
@@ -255,13 +272,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
               <h2 className="text-lg font-semibold text-white">
-                {editing ? 'Editar Instalación' : 'Nueva Instalación'}
+                {editing ? 'Editar Instalacion' : 'Nueva Instalacion'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
+              <button onClick={closeModal} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
                 <X size={18} />
               </button>
             </div>
@@ -305,13 +322,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
                 </div>
               </div>
               <div>
-                <label className="label">Dirección *</label>
+                <label className="label">Direccion *</label>
                 <input
                   type="text"
                   value={form.direccion}
                   onChange={(e) => setForm({ ...form, direccion: e.target.value })}
                   className="input"
-                  placeholder="Dirección de la instalación"
+                  placeholder="Direccion de la instalacion"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -339,13 +356,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
                 </div>
               </div>
               <div>
-                <label className="label">Técnico Asignado</label>
+                <label className="label">Tecnico Asignado</label>
                 <input
                   type="text"
                   value={form.tecnico_asignado}
                   onChange={(e) => setForm({ ...form, tecnico_asignado: e.target.value })}
                   className="input"
-                  placeholder="Nombre del técnico"
+                  placeholder="Nombre del tecnico"
                 />
               </div>
               <div>
@@ -359,7 +376,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 p-4 border-t border-[#1F2937]">
-              <button onClick={() => setShowModal(false)} className="btn-secondary">
+              <button onClick={closeModal} className="btn-secondary">
                 Cancelar
               </button>
               <button onClick={handleSave} disabled={loading} className="btn-primary">

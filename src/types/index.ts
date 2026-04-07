@@ -210,10 +210,12 @@ export interface Tarea {
 export interface ActivityLog {
   id: string;
   usuario_id: string | null;
+  usuario_nombre: string | null;
   accion: string;
+  entidad: string | null;
+  entidad_id: string | null;
+  detalles: Record<string, unknown> | null;
   detalle: string | null;
-  tabla: string | null;
-  registro_id: string | null;
   created_at: string;
   profiles?: Profile;
 }

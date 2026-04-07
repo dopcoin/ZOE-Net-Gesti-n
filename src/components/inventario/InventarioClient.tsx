@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useMemo, useEffect } from 'react';
+import { createMercancia, updateMercancia, deleteMercancia, getErrorMessage } from '@/lib/services';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, Package, AlertTriangle, X } from 'lucide-react';
@@ -35,13 +35,27 @@ const emptyForm: FormData = {
 };
 
 export default function InventarioClient({ mercancia: initialMercancia, categorias }: Props) {
-  const supabase = createClient();
   const [items, setItems] = useState<Mercancia[]>(initialMercancia);
   const [search, setSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('');
   const [modal, setModal] = useState<{ open: boolean; mode: 'create' | 'edit'; id?: string }>({ open: false, mode: 'create' });
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [loading, setLoading] = useState(false);
+
+  // Escape key handler and body overflow cleanup
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (modal.open) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [modal.open]);
 
   // --- Filtering ---
   const filtered = useMemo(() => {
@@ -121,6 +135,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
     }
     setLoading(true);
 
+    const activo = formData.activo;
     const payload = {
       nombre: formData.nombre.trim(),
       descripcion: formData.descripcion.trim() || null,
@@ -129,49 +144,52 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       precio_venta: parseFloat(formData.precio_venta) || 0,
       stock: parseInt(formData.stock) || 0,
       stock_minimo: parseInt(formData.stock_minimo) || 0,
-      activo: formData.activo,
+      activo,
+      estado: activo ? 'disponible' : 'inactivo',
     };
 
-    try {
-      if (modal.mode === 'create') {
-        const { data, error } = await supabase
-          .from('mercancia')
-          .insert(payload)
-          .select('*, categorias_mercancia(nombre)')
-          .single();
-        if (error) throw error;
-        setItems((prev) => [...prev, data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-        toast.success('Producto creado exitosamente');
-      } else {
-        const { data, error } = await supabase
-          .from('mercancia')
-          .update(payload)
-          .eq('id', modal.id!)
-          .select('*, categorias_mercancia(nombre)')
-          .single();
-        if (error) throw error;
-        setItems((prev) => prev.map((i) => (i.id === modal.id ? data : i)));
-        toast.success('Producto actualizado exitosamente');
+    if (modal.mode === 'create') {
+      const result = await createMercancia(payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
       }
-      closeModal();
-    } catch (err: any) {
-      toast.error(err.message || 'Error al guardar');
-    } finally {
-      setLoading(false);
+      // Optimistic: refresh will pick up the new item with relations
+      toast.success('Producto creado exitosamente');
+    } else {
+      const result = await updateMercancia(modal.id!, payload);
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        setLoading(false);
+        return;
+      }
+      toast.success('Producto actualizado exitosamente');
     }
+
+    // Re-fetch items to get proper relations
+    const { createClient } = await import('@/lib/supabase/client');
+    const supabase = createClient();
+    const { data: refreshed } = await supabase
+      .from('mercancia')
+      .select('*, categorias_mercancia(nombre)')
+      .order('nombre');
+    if (refreshed) setItems(refreshed);
+
+    closeModal();
+    setLoading(false);
   };
 
   const handleDelete = async (id: string, nombre: string) => {
     if (!confirm(`Eliminar "${nombre}"? Esta accion no se puede deshacer.`)) return;
 
-    try {
-      const { error } = await supabase.from('mercancia').delete().eq('id', id);
-      if (error) throw error;
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      toast.success('Producto eliminado');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar');
+    const result = await deleteMercancia(id);
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
     }
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    toast.success('Producto eliminado');
   };
 
   const updateField = (field: keyof FormData, value: string | boolean) => {
