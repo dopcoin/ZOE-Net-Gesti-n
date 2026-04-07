@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createConciliacion, getErrorMessage } from '@/lib/services';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils';
-import { Plus, X, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { Plus, X, ClipboardCheck, AlertTriangle, Users } from 'lucide-react';
 
 interface MercanciaOption {
   id: string;
@@ -140,6 +140,18 @@ export default function ConciliacionClient({
     return 'text-gray-400';
   };
 
+  // Totals per revendedor
+  const revendedorTotals = revendedores
+    .map((r) => {
+      const registros = conciliaciones.filter((c) => c.revendedor_id === r.id);
+      const totalRegistros = registros.length;
+      const faltantesRev = registros.filter((c) => c.diferencia < 0).reduce((acc, c) => acc + c.diferencia, 0);
+      const sobrantesRev = registros.filter((c) => c.diferencia > 0).reduce((acc, c) => acc + c.diferencia, 0);
+      return { ...r, totalRegistros, faltantesRev, sobrantesRev };
+    })
+    .filter((r) => r.totalRegistros > 0)
+    .sort((a, b) => b.totalRegistros - a.totalRegistros);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -176,6 +188,51 @@ export default function ConciliacionClient({
           <p className="text-2xl font-bold text-emerald-400">{sobrantes}</p>
         </div>
       </div>
+
+      {/* Totales por Revendedor */}
+      {revendedorTotals.length > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-5 w-5 text-blue-400" />
+            <h2 className="text-base font-semibold text-gray-100">Totales por Revendedor</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#1F2937]">
+                  <th className="table-header">Revendedor</th>
+                  <th className="table-header text-center">Registros</th>
+                  <th className="table-header text-center">Unidades Faltantes</th>
+                  <th className="table-header text-center">Unidades Sobrantes</th>
+                  <th className="table-header text-center">Balance Neto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {revendedorTotals.map((r) => {
+                  const neto = r.sobrantesRev + r.faltantesRev;
+                  return (
+                    <tr key={r.id} className="border-b border-[#1F2937] hover:bg-[#1C2333]/50 transition-colors">
+                      <td className="table-cell font-medium text-gray-100">
+                        {r.nombre} {r.apellido}
+                      </td>
+                      <td className="table-cell text-center text-gray-300">{r.totalRegistros}</td>
+                      <td className="table-cell text-center text-red-400">
+                        {r.faltantesRev < 0 ? r.faltantesRev : '—'}
+                      </td>
+                      <td className="table-cell text-center text-emerald-400">
+                        {r.sobrantesRev > 0 ? `+${r.sobrantesRev}` : '—'}
+                      </td>
+                      <td className={`table-cell text-center font-semibold ${diferenciaColor(neto)}`}>
+                        {neto > 0 ? `+${neto}` : neto < 0 ? neto : '0'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="card overflow-hidden">

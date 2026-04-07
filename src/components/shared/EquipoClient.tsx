@@ -104,43 +104,20 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
     }
     setLoading(true);
     try {
-      const supabase = createClient();
-      // Intentar obtener sesión válida; refrescar si expiró (evita 401)
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        const { data: refreshed } = await supabase.auth.refreshSession();
-        session = refreshed.session;
-      }
-      if (!session?.access_token) {
-        toast.error('Sesión expirada. Recarga la página e inicia sesión nuevamente.');
-        setLoading(false);
-        return;
-      }
-
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-      // Use Edge Function for secure user creation (uses service_role server-side)
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/create-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': supabaseKey || '',
-          },
-          body: JSON.stringify({
-            email: form.email,
-            password: form.password,
-            nombre: form.nombre,
-            apellido: form.apellido || '',
-            rol: form.rol,
-            equipo: form.equipo || null,
-            telefono: form.telefono || null,
-          }),
-        }
-      );
+      // Usar API Route de Next.js — no tiene problemas de JWT expirado
+      const response = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          nombre: form.nombre,
+          apellido: form.apellido || '',
+          rol: form.rol,
+          equipo: form.equipo || null,
+          telefono: form.telefono || null,
+        }),
+      });
 
       const result = await response.json();
       if (!response.ok) {

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
 import { formatDate, estadoInstalacionColor, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, X, Wrench } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 import type { EstadoInstalacion, Prioridad } from '@/types';
 
 interface Instalacion {
@@ -49,6 +50,9 @@ const defaultForm = {
   fecha_programada: new Date().toISOString().split('T')[0],
   notas: '',
   tecnico_asignado: '',
+  costo: 0,
+  estado_cobro: 'sin_costo' as 'sin_costo' | 'pendiente' | 'pagado',
+  descripcion_cobro: '',
 };
 
 export default function InstalacionesClient({ instalaciones: initial, clientes }: Props) {
@@ -107,6 +111,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
 
   function openEdit(inst: Instalacion) {
     setEditing(inst);
+    const i = inst as Instalacion & { costo?: number; estado_cobro?: string; descripcion_cobro?: string };
     setForm({
       cliente_id: inst.cliente_id,
       tipo: inst.tipo,
@@ -116,6 +121,9 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
       fecha_programada: inst.fecha_programada ?? '',
       notas: inst.notas ?? '',
       tecnico_asignado: inst.tecnico_asignado ?? '',
+      costo: i.costo ?? 0,
+      estado_cobro: (i.estado_cobro as 'sin_costo' | 'pendiente' | 'pagado') ?? 'sin_costo',
+      descripcion_cobro: i.descripcion_cobro ?? '',
     });
     setShowModal(true);
   }
@@ -135,6 +143,9 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
       fecha_programada: form.fecha_programada || null,
       notas: form.notas || null,
       tecnico_asignado: form.tecnico_asignado || null,
+      costo: form.costo || 0,
+      estado_cobro: form.estado_cobro,
+      descripcion_cobro: form.descripcion_cobro || null,
     };
 
     if (editing) {
@@ -226,6 +237,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
               <th className="table-header">Prioridad</th>
               <th className="table-header">Estado</th>
               <th className="table-header">Fecha</th>
+              <th className="table-header">Cobro</th>
               <th className="table-header">Acciones</th>
             </tr>
           </thead>
@@ -253,6 +265,23 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
                     </span>
                   </td>
                   <td className="table-cell">{formatDate(inst.fecha_programada)}</td>
+                  <td className="table-cell">
+                    {(() => {
+                      const i = inst as Instalacion & { costo?: number; estado_cobro?: string };
+                      if (!i.estado_cobro || i.estado_cobro === 'sin_costo') return <span className="text-gray-600 text-xs">—</span>;
+                      return (
+                        <div className="flex items-center gap-1">
+                          <DollarSign size={12} className={i.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'} />
+                          <span className={`text-xs font-medium ${i.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                            {formatCurrency(i.costo ?? 0)}
+                          </span>
+                          <span className={`badge text-xs ${i.estado_cobro === 'pagado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                            {i.estado_cobro === 'pagado' ? 'Pagado' : 'Pendiente'}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="table-cell">
                     <div className="flex items-center gap-1">
                       <button onClick={() => openEdit(inst)} className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-white transition-colors">
@@ -366,6 +395,48 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
                   className="input"
                   placeholder="Nombre del tecnico"
                 />
+              </div>
+              {/* Cobro */}
+              <div className="border-t border-[#1F2937] pt-3">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Cobro de instalación</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Costo (DOP)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.costo}
+                      onChange={(e) => setForm({ ...form, costo: parseFloat(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Estado del Cobro</label>
+                    <select
+                      value={form.estado_cobro}
+                      onChange={(e) => setForm({ ...form, estado_cobro: e.target.value as 'sin_costo' | 'pendiente' | 'pagado' })}
+                      className="input"
+                    >
+                      <option value="sin_costo">Sin costo</option>
+                      <option value="pendiente">Pendiente de pago</option>
+                      <option value="pagado">Pagado</option>
+                    </select>
+                  </div>
+                </div>
+                {form.estado_cobro !== 'sin_costo' && (
+                  <div className="mt-3">
+                    <label className="label">Descripción del cobro</label>
+                    <input
+                      type="text"
+                      value={form.descripcion_cobro}
+                      onChange={(e) => setForm({ ...form, descripcion_cobro: e.target.value })}
+                      className="input"
+                      placeholder="Ej: Instalación de fibra óptica..."
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label">Notas</label>

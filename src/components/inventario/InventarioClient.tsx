@@ -135,7 +135,6 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
     }
     setLoading(true);
 
-    const activo = formData.activo;
     const payload = {
       nombre: formData.nombre.trim(),
       descripcion: formData.descripcion.trim() || null,
@@ -144,8 +143,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       precio_venta: parseFloat(formData.precio_venta) || 0,
       stock: parseInt(formData.stock) || 0,
       stock_minimo: parseInt(formData.stock_minimo) || 0,
-      activo,
-      estado: activo ? 'disponible' : 'inactivo',
+      activo: formData.activo,
     };
 
     if (modal.mode === 'create') {
@@ -181,8 +179,30 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
   };
 
   const handleDelete = async (id: string, nombre: string) => {
-    if (!confirm(`Eliminar "${nombre}"? Esta accion no se puede deshacer.`)) return;
+    // Check if product has associated ventas (FK constraint)
+    const { createClient: getClient } = await import('@/lib/supabase/client');
+    const supabase = getClient();
+    const { count } = await supabase
+      .from('ventas')
+      .select('id', { count: 'exact', head: true })
+      .eq('mercancia_id', id);
 
+    if (count && count > 0) {
+      const deactivate = confirm(
+        `"${nombre}" tiene ${count} venta(s) asociada(s) y no se puede eliminar.\n\n¿Desactivar el producto en cambio? (Ya no aparecerá en nuevas ventas)`
+      );
+      if (!deactivate) return;
+      const result = await updateMercancia(id, { activo: false });
+      if (result.error) {
+        toast.error(getErrorMessage(result.error));
+        return;
+      }
+      setItems((prev) => prev.map((i) => i.id === id ? { ...i, activo: false } : i));
+      toast.success(`"${nombre}" desactivado`);
+      return;
+    }
+
+    if (!confirm(`Eliminar "${nombre}"? Esta accion no se puede deshacer.`)) return;
     const result = await deleteMercancia(id);
     if (result.error) {
       toast.error(getErrorMessage(result.error));
