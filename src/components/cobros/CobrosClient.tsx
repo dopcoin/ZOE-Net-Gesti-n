@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2 } from 'lucide-react';
 import type { Cliente, Cobro, EstadoCobro, TipoCobro } from '@/types';
 
 interface Props {
@@ -34,6 +34,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<ModalData | null>(null);
   const [formMonto, setFormMonto] = useState('');
+  const [formEstado, setFormEstado] = useState<EstadoCobro>('pagado');
   const [formTipoPago, setFormTipoPago] = useState<TipoCobro>('efectivo');
   const [formNotas, setFormNotas] = useState('');
   const [formFechaPago, setFormFechaPago] = useState('');
@@ -176,6 +177,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   function openModal(cc: ClienteCobro) {
     setModalData({ cliente: cc.cliente, cobro: cc.cobro });
     setFormMonto(cc.cobro?.monto?.toString() ?? cc.cliente.monto_mensual.toString());
+    setFormEstado((cc.cobro?.estado as EstadoCobro) ?? 'pagado');
     setFormTipoPago((cc.cobro?.tipo_pago as TipoCobro) ?? 'efectivo');
     setFormNotas(cc.cobro?.notas ?? '');
     setFormFechaPago(
@@ -226,19 +228,44 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       }
       await upsertCobro(
         modalData.cliente.id,
-        'pagado',
+        formEstado,
         monto,
-        formTipoPago,
+        formEstado === 'pagado' || formEstado === 'parcial' ? formTipoPago : null,
         formNotas || null,
-        formFechaPago ? new Date(formFechaPago).toISOString() : new Date().toISOString(),
+        formEstado === 'pagado' || formEstado === 'parcial'
+          ? (formFechaPago ? new Date(formFechaPago).toISOString() : new Date().toISOString())
+          : null,
         modalData.cobro?.id
       );
-      toast.success(`Cobro detallado registrado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);
+      toast.success(`Cobro actualizado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);
       closeModal();
       router.refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar cobro';
-      toast.error(message);
+      const msg = err instanceof Error ? err.message :
+        (err && typeof err === 'object' && 'message' in err) ? (err as {message: string}).message :
+        'Error al guardar cobro';
+      toast.error(msg);
+    } finally {
+      setSavingModal(false);
+    }
+  }
+
+  async function handleDeleteCobro() {
+    if (!modalData?.cobro) return;
+    if (!window.confirm('¿Eliminar este registro de cobro? El cliente quedará en estado pendiente.')) return;
+    setSavingModal(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('cobros').delete().eq('id', modalData.cobro.id);
+      if (error) throw error;
+      toast.success('Cobro eliminado');
+      closeModal();
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message :
+        (err && typeof err === 'object' && 'message' in err) ? (err as {message: string}).message :
+        'Error al eliminar cobro';
+      toast.error(msg);
     } finally {
       setSavingModal(false);
     }
@@ -451,6 +478,21 @@ export default function CobrosClient({ clientes, cobros }: Props) {
               {meses[currentMonth - 1]} {currentYear} &middot; Plan: {modalData.cliente.plan ?? 'N/A'} &middot; Mensualidad: {formatCurrency(modalData.cliente.monto_mensual)}
             </p>
             <form onSubmit={handleModalSubmit} className="space-y-4">
+              {/* Estado */}
+              <div>
+                <label className="label">Estado</label>
+                <select
+                  value={formEstado}
+                  onChange={(e) => setFormEstado(e.target.value as EstadoCobro)}
+                  className="input w-full"
+                >
+                  <option value="pagado">Pagado</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="mora">Mora</option>
+                  <option value="parcial">Parcial</option>
+                  <option value="exonerado">Exonerado</option>
+                </select>
+              </div>
               <div>
                 <label className="label">Monto</label>
                 <input
@@ -463,45 +505,62 @@ export default function CobrosClient({ clientes, cobros }: Props) {
                   required
                 />
               </div>
-              <div>
-                <label className="label">Tipo de Pago</label>
-                <select
-                  value={formTipoPago}
-                  onChange={(e) => setFormTipoPago(e.target.value as TipoCobro)}
-                  className="input w-full"
-                >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="tarjeta">Tarjeta</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Fecha de Pago</label>
-                <input
-                  type="date"
-                  value={formFechaPago}
-                  onChange={(e) => setFormFechaPago(e.target.value)}
-                  className="input w-full"
-                />
-              </div>
+              {(formEstado === 'pagado' || formEstado === 'parcial') && (
+                <>
+                  <div>
+                    <label className="label">Tipo de Pago</label>
+                    <select
+                      value={formTipoPago}
+                      onChange={(e) => setFormTipoPago(e.target.value as TipoCobro)}
+                      className="input w-full"
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Fecha de Pago</label>
+                    <input
+                      type="date"
+                      value={formFechaPago}
+                      onChange={(e) => setFormFechaPago(e.target.value)}
+                      className="input w-full"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="label">Notas</label>
                 <textarea
                   value={formNotas}
                   onChange={(e) => setFormNotas(e.target.value)}
                   className="input w-full"
-                  rows={3}
+                  rows={2}
                   placeholder="Notas opcionales..."
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="btn-secondary">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={savingModal} className="btn-primary">
-                  {savingModal ? 'Guardando...' : 'Guardar Cobro'}
-                </button>
+              <div className="flex justify-between items-center pt-2">
+                {modalData?.cobro ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteCobro}
+                    disabled={savingModal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    Eliminar cobro
+                  </button>
+                ) : <span />}
+                <div className="flex gap-3">
+                  <button type="button" onClick={closeModal} className="btn-secondary">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={savingModal} className="btn-primary">
+                    {savingModal ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

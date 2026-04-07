@@ -11,7 +11,7 @@ import {
   categoriasIngreso,
   categoriasEgreso,
 } from '@/lib/utils';
-import { Plus, X, BookOpen, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, X, BookOpen, TrendingUp, TrendingDown, Edit2, Trash2 } from 'lucide-react';
 
 interface Props {
   registros: LibroDiario[];
@@ -93,12 +93,19 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
     }
 
     setLoading(true);
+
+    // Get current user to set registrado_por
+    const { createClient } = await import('@/lib/supabase/client');
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
     const payload = {
       tipo: formData.tipo,
       categoria: formData.categoria,
       descripcion: formData.descripcion,
       monto: formData.monto,
       referencia: formData.referencia || null,
+      ...(modalMode === 'create' && user ? { registrado_por: user.id } : {}),
     };
 
     if (modalMode === 'create') {
@@ -220,13 +227,14 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
                 <th className="table-header">Descripcion</th>
                 <th className="table-header">Monto</th>
                 <th className="table-header">Referencia</th>
+                <th className="table-header">Agregado por</th>
                 <th className="table-header text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {registros.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-cell text-center text-gray-500 py-12">
+                  <td colSpan={8} className="table-cell text-center text-gray-500 py-12">
                     No hay registros en el libro diario
                   </td>
                 </tr>
@@ -261,6 +269,11 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
                       {formatCurrency(r.monto)}
                     </td>
                     <td className="table-cell text-gray-400">{r.referencia ?? '—'}</td>
+                    <td className="table-cell text-gray-300 text-sm">
+                      {r.profiles
+                        ? `${r.profiles.nombre} ${r.profiles.apellido}`
+                        : <span className="text-gray-600">—</span>}
+                    </td>
                     <td className="table-cell text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
@@ -268,14 +281,14 @@ export default function LibroDiarioClient({ registros: initial }: Props) {
                           className="p-1.5 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                           title="Editar"
                         >
-                          <BookOpen className="h-4 w-4" />
+                          <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(r)}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Eliminar"
                         >
-                          <X className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
