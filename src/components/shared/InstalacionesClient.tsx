@@ -42,11 +42,11 @@ const estadoLabels: Record<EstadoInstalacion, string> = {
 
 const defaultForm = {
   cliente_id: '',
-  tipo: 'fibra' as string,
+  tipo: 'nueva' as string,
   direccion: '',
   prioridad: 'normal' as Prioridad,
   estado: 'pendiente' as EstadoInstalacion,
-  fecha_programada: '',
+  fecha_programada: new Date().toISOString().split('T')[0],
   notas: '',
   tecnico_asignado: '',
 };
@@ -302,9 +302,11 @@ export default function InstalacionesClient({ instalaciones: initial, clientes }
                 <div>
                   <label className="label">Tipo</label>
                   <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="input">
-                    <option value="fibra">Fibra</option>
-                    <option value="wireless">Wireless</option>
-                    <option value="mixta">Mixta</option>
+                    <option value="nueva">Nueva</option>
+                    <option value="mantenimiento">Mantenimiento</option>
+                    <option value="actualizacion">Actualización</option>
+                    <option value="desconexion">Desconexión</option>
+                    <option value="revision">Revisión</option>
                   </select>
                 </div>
                 <div>

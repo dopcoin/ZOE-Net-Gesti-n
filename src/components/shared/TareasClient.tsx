@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { createTarea, updateTarea, deleteTarea, toggleTarea, getErrorMessage } from '@/lib/services';
 import { formatDate, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -13,6 +14,7 @@ interface MiembroOption {
   nombre: string;
   apellido: string;
   equipo: Equipo | null;
+  rol?: string;
 }
 
 interface Props {
@@ -95,7 +97,10 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
     return matchEquipo && matchSearch;
   });
 
-  const miembrosFiltrados = miembros.filter((m) => m.equipo === form.equipo);
+  // Match by equipo field, or fallback: match by rol when equipo is null
+  const miembrosFiltrados = miembros.filter(
+    (m) => m.equipo === form.equipo || (m.equipo === null && m.rol === form.equipo)
+  );
 
   function openCreate() {
     setEditing(null);
@@ -142,12 +147,16 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
         router.refresh();
       }
     } else {
-      // Include backwards compat fields on insert
+      // Get current user ID so RLS policy (creado_por = auth.uid()) passes
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
       const insertPayload: Record<string, unknown> = {
         ...payload,
         tipo_equipo: form.equipo,
         completada: false,
         estado: 'pendiente',
+        creado_por: user?.id ?? null,
       };
       const result = await createTarea(insertPayload);
       if (result.error) {
