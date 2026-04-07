@@ -17,9 +17,17 @@ interface MiembroOption {
   rol?: string;
 }
 
+interface ClienteOption {
+  id: string;
+  nombre: string;
+  apellido: string;
+}
+
 interface Props {
-  tareas: (Tarea & { profiles?: Profile })[];
+  tareas: (Tarea & { profiles?: Profile; clientes?: { nombre: string; apellido: string } | null })[];
   miembros: MiembroOption[];
+  clientes: ClienteOption[];
+  userId: string | null;
 }
 
 const equipoLabels: Record<Equipo, string> = {
@@ -41,6 +49,7 @@ const defaultForm = {
   asignado_a: '',
   prioridad: 'normal' as Prioridad,
   fecha_limite: '',
+  cliente_id: '',
 };
 
 function isOverdue(fecha_limite: string | null, completada: boolean): boolean {
@@ -48,11 +57,12 @@ function isOverdue(fecha_limite: string | null, completada: boolean): boolean {
   return new Date(fecha_limite) < new Date(new Date().toDateString());
 }
 
-export default function TareasClient({ tareas: initial, miembros }: Props) {
+export default function TareasClient({ tareas: initial, miembros, clientes, userId }: Props) {
   const router = useRouter();
   const [tareas, setTareas] = useState(initial);
   const [search, setSearch] = useState('');
   const [filtroEquipo, setFiltroEquipo] = useState<Equipo | 'todos'>('todos');
+  const [soloMias, setSoloMias] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Tarea | null>(null);
   const [form, setForm] = useState(defaultForm);
@@ -88,13 +98,18 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
     };
   }, [showModal, closeModal]);
 
+  const miTareasCount = userId
+    ? tareas.filter((t) => t.asignado_a === userId && !t.completada).length
+    : 0;
+
   const filtered = tareas.filter((t) => {
     const matchEquipo = filtroEquipo === 'todos' || t.equipo === filtroEquipo;
     const matchSearch =
       search === '' ||
       t.titulo.toLowerCase().includes(search.toLowerCase()) ||
       (t.descripcion ?? '').toLowerCase().includes(search.toLowerCase());
-    return matchEquipo && matchSearch;
+    const matchMias = !soloMias || (userId && t.asignado_a === userId);
+    return matchEquipo && matchSearch && matchMias;
   });
 
   // Match by equipo field, or fallback: match by rol when equipo is null
@@ -117,6 +132,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
       asignado_a: tarea.asignado_a ?? '',
       prioridad: tarea.prioridad,
       fecha_limite: tarea.fecha_limite ?? '',
+      cliente_id: tarea.cliente_id ?? '',
     });
     setShowModal(true);
   }
@@ -135,6 +151,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
       asignado_a: form.asignado_a || null,
       prioridad: form.prioridad,
       fecha_limite: form.fecha_limite || null,
+      cliente_id: form.cliente_id || null,
     };
 
     if (editing) {
@@ -219,6 +236,7 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                 <th className="table-header w-10"></th>
                 <th className="table-header">Titulo</th>
                 <th className="table-header">Asignado</th>
+                <th className="table-header">Cliente</th>
                 <th className="table-header">Prioridad</th>
                 <th className="table-header">Fecha Limite</th>
                 <th className="table-header w-10"></th>
@@ -227,12 +245,13 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
             <tbody>
               {tareasEquipo.map((tarea) => {
                 const overdue = isOverdue(tarea.fecha_limite, tarea.completada);
+                const esMia = userId && tarea.asignado_a === userId;
                 return (
                   <tr
                     key={tarea.id}
                     className={`border-b border-[#1F2937]/50 hover:bg-[#1C2333]/50 transition-colors ${
                       tarea.completada ? 'opacity-60' : ''
-                    }`}
+                    } ${esMia && !tarea.completada ? 'bg-purple-500/5' : ''}`}
                   >
                     <td className="table-cell">
                       <button
@@ -269,6 +288,11 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                     <td className="table-cell">
                       {tarea.profiles
                         ? `${tarea.profiles.nombre} ${tarea.profiles.apellido}`
+                        : '\u2014'}
+                    </td>
+                    <td className="table-cell text-sm text-gray-400">
+                      {tarea.clientes
+                        ? `${tarea.clientes.nombre} ${tarea.clientes.apellido}`
                         : '\u2014'}
                     </td>
                     <td className="table-cell">
@@ -333,6 +357,23 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
             </span>
           </button>
         ))}
+        {userId && (
+          <button
+            onClick={() => setSoloMias((v) => !v)}
+            className={`badge cursor-pointer transition-colors ${
+              soloMias
+                ? 'bg-purple-600 text-white'
+                : 'bg-[#1C2333] text-gray-400 hover:bg-[#2A3142]'
+            }`}
+          >
+            Mis Tareas
+            {miTareasCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-purple-500 text-white rounded-full">
+                {miTareasCount}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -449,6 +490,20 @@ export default function TareasClient({ tareas: initial, miembros }: Props) {
                     className="input"
                   />
                 </div>
+              </div>
+              {/* Cliente relacionado (opcional) */}
+              <div>
+                <label className="label">Cliente relacionado <span className="text-gray-600">(opcional)</span></label>
+                <select
+                  value={form.cliente_id}
+                  onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}
+                  className="input"
+                >
+                  <option value="">— Sin cliente relacionado —</option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre} {c.apellido}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 p-4 border-t border-[#1F2937]">

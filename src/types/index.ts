@@ -201,6 +201,7 @@ export interface Tarea {
   descripcion: string | null;
   equipo: Equipo;
   asignado_a: string | null;
+  cliente_id: string | null;
   prioridad: Prioridad;
   completada: boolean;
   fecha_limite: string | null;
@@ -208,6 +209,7 @@ export interface Tarea {
   created_at: string;
   updated_at: string;
   profiles?: Profile;
+  clientes?: { nombre: string; apellido: string } | null;
 }
 
 export interface ActivityLog {

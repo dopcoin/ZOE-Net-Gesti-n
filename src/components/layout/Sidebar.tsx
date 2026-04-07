@@ -41,6 +41,7 @@ export default function Sidebar() {
   const { sidebarOpen, sidebarCollapsed, toggleCollapsed, setSidebarOpen } = useAppStore();
   const rol = profile?.rol || 'admin';
   const [isMobile, setIsMobile] = useState(false);
+  const [tareasBadge, setTareasBadge] = useState(0);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -48,6 +49,24 @@ export default function Sidebar() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Fetch count of pending tasks assigned to the current user
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    const fetchCount = async () => {
+      const { createClient: getClient } = await import('@/lib/supabase/client');
+      const supabase = getClient();
+      const { count } = await supabase
+        .from('tareas')
+        .select('id', { count: 'exact', head: true })
+        .eq('asignado_a', profile.id)
+        .eq('completada', false);
+      if (!cancelled) setTareasBadge(count ?? 0);
+    };
+    fetchCount();
+    return () => { cancelled = true; };
+  }, [profile?.id]);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -102,11 +121,13 @@ export default function Sidebar() {
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
           {filtered.map((item) => {
             const active = pathname === item.href;
+            const isTareas = item.href === '/tareas';
+            const badge = isTareas && tareasBadge > 0 ? tareasBadge : 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                   ${active
                     ? 'bg-blue-500/10 text-blue-400'
                     : 'text-gray-400 hover:bg-[#1C2333] hover:text-gray-200'
@@ -114,7 +135,14 @@ export default function Sidebar() {
                   ${sidebarCollapsed ? 'justify-center' : ''}`}
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                {item.icon}
+                <span className="relative flex-shrink-0">
+                  {item.icon}
+                  {badge > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold bg-purple-600 text-white rounded-full">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </span>
                 {!sidebarCollapsed && <span>{item.label}</span>}
               </Link>
             );

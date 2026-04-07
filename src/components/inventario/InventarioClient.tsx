@@ -189,7 +189,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
 
     if (count && count > 0) {
       const deactivate = confirm(
-        `"${nombre}" tiene ${count} venta(s) asociada(s) y no se puede eliminar.\n\n¿Desactivar el producto en cambio? (Ya no aparecerá en nuevas ventas)`
+        `"${nombre}" tiene ${count} venta(s) en el historial y no puede eliminarse (integridad de datos).\n\n¿Desactivar en cambio? El producto quedará oculto del inventario activo pero se conserva el historial.`
       );
       if (!deactivate) return;
       const result = await updateMercancia(id, { activo: false });
@@ -205,6 +205,18 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
     if (!confirm(`Eliminar "${nombre}"? Esta accion no se puede deshacer.`)) return;
     const result = await deleteMercancia(id);
     if (result.error) {
+      // Fallback: FK violation means there are ventas we couldn't count (RLS)
+      if (result.error.code === '23503') {
+        const deactivate = confirm(
+          `"${nombre}" tiene ventas asociadas y no puede eliminarse.\n\n¿Desactivar en cambio?`
+        );
+        if (deactivate) {
+          await updateMercancia(id, { activo: false });
+          setItems((prev) => prev.map((i) => i.id === id ? { ...i, activo: false } : i));
+          toast.success(`"${nombre}" desactivado`);
+        }
+        return;
+      }
       toast.error(getErrorMessage(result.error));
       return;
     }

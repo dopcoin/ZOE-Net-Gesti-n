@@ -39,12 +39,18 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   const [formNotas, setFormNotas] = useState('');
   const [formFechaPago, setFormFechaPago] = useState('');
   const [savingModal, setSavingModal] = useState(false);
+  const [localidadFilter, setLocalidadFilter] = useState<string | null>(null);
 
   // Historial modal
   const [historialOpen, setHistorialOpen] = useState(false);
   const [historialCliente, setHistorialCliente] = useState<Cliente | null>(null);
   const [historialCobros, setHistorialCobros] = useState<Cobro[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
+
+  const localidades = useMemo(() => {
+    const locs = clientes.map((c) => c.localidad).filter((l): l is string => !!l);
+    return Array.from(new Set(locs)).sort();
+  }, [clientes]);
 
   const clientesCobros = useMemo<ClienteCobro[]>(() => {
     return clientes.map((cliente) => {
@@ -59,12 +65,15 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   }, [clientes, cobros, currentMonth, currentYear]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return clientesCobros;
-    const q = search.toLowerCase();
-    return clientesCobros.filter((cc) =>
-      `${cc.cliente.nombre} ${cc.cliente.apellido}`.toLowerCase().includes(q)
-    );
-  }, [clientesCobros, search]);
+    return clientesCobros.filter((cc) => {
+      if (localidadFilter && cc.cliente.localidad !== localidadFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        if (!`${cc.cliente.nombre} ${cc.cliente.apellido}`.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [clientesCobros, search, localidadFilter]);
 
   const stats = useMemo(() => {
     const total = clientesCobros.length;
@@ -328,18 +337,33 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       </div>
 
       {/* Month Navigation + Search */}
-      <div className="card p-4">
+      <div className="card p-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <button
               onClick={prevMonth}
               className="p-2 rounded-lg hover:bg-[#1C2333] transition-colors text-gray-400 hover:text-white"
             >
               <ChevronLeft size={20} />
             </button>
-            <span className="text-lg font-semibold text-white min-w-[200px] text-center">
-              {meses[currentMonth - 1]} {currentYear}
-            </span>
+            <select
+              value={currentMonth}
+              onChange={(e) => setCurrentMonth(Number(e.target.value))}
+              className="input py-1.5 pr-8 text-sm font-semibold text-white"
+            >
+              {meses.map((m, i) => (
+                <option key={i} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={currentYear}
+              onChange={(e) => setCurrentYear(Number(e.target.value))}
+              className="input py-1.5 pr-8 text-sm font-semibold text-white w-24"
+            >
+              {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
             <button
               onClick={nextMonth}
               className="p-2 rounded-lg hover:bg-[#1C2333] transition-colors text-gray-400 hover:text-white"
@@ -358,7 +382,70 @@ export default function CobrosClient({ clientes, cobros }: Props) {
             />
           </div>
         </div>
+
+        {/* Localidad filter pills */}
+        {localidades.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setLocalidadFilter(null)}
+              className={`badge cursor-pointer transition-colors ${
+                localidadFilter === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-[#1C2333] text-gray-400 hover:bg-[#2A3142]'
+              }`}
+            >
+              Todas las zonas
+              <span className="ml-1.5 text-xs opacity-70">{clientesCobros.length}</span>
+            </button>
+            {localidades.map((loc) => {
+              const count = clientesCobros.filter((cc) => cc.cliente.localidad === loc).length;
+              return (
+                <button
+                  key={loc}
+                  onClick={() => setLocalidadFilter(loc === localidadFilter ? null : loc)}
+                  className={`badge cursor-pointer transition-colors ${
+                    localidadFilter === loc
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[#1C2333] text-gray-400 hover:bg-[#2A3142]'
+                  }`}
+                >
+                  {loc}
+                  <span className="ml-1.5 text-xs opacity-70">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Localidad summary */}
+      {localidades.length > 0 && !localidadFilter && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {localidades.map((loc) => {
+            const lcc = clientesCobros.filter((cc) => cc.cliente.localidad === loc);
+            const pagados = lcc.filter((cc) => cc.estado === 'pagado').length;
+            const pendientes = lcc.filter((cc) => cc.estado === 'pendiente' || cc.estado === 'mora').length;
+            const recaudado = lcc.filter((cc) => cc.estado === 'pagado' && cc.cobro).reduce((s, cc) => s + (cc.cobro?.monto ?? 0), 0);
+            return (
+              <button
+                key={loc}
+                onClick={() => setLocalidadFilter(loc)}
+                className="card p-3 text-left hover:bg-[#1C2333] transition-colors cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-white">{loc}</span>
+                  <span className="text-xs text-gray-500">{lcc.length} clientes</span>
+                </div>
+                <div className="flex gap-3 text-xs">
+                  <span className="text-emerald-400">{pagados} pagados</span>
+                  <span className="text-red-400">{pendientes} pendientes</span>
+                  <span className="text-blue-400 ml-auto">{formatCurrency(recaudado)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Cobros List */}
       <div className="card overflow-hidden">

@@ -200,8 +200,26 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
     setLoading(false);
   }
 
-  async function handleDeleteRevendedor(id: string) {
-    if (!confirm('Eliminar este revendedor?')) return;
+  async function handleDeleteRevendedor(id: string, nombre: string) {
+    // Check if revendedor has associated ventas (FK constraint on ventas.revendedor_id)
+    const { count } = await supabase
+      .from('ventas')
+      .select('id', { count: 'exact', head: true })
+      .eq('revendedor_id', id);
+
+    if (count && count > 0) {
+      const deactivate = confirm(
+        `"${nombre}" tiene ${count} venta(s) registrada(s) y no se puede eliminar.\n\n¿Desactivar el revendedor en cambio? Seguirá en el historial pero no aparecerá en nuevas ventas.`
+      );
+      if (!deactivate) return;
+      const result = await updateRevendedor(id, { activo: false });
+      if (result.error) { toast.error(getErrorMessage(result.error)); return; }
+      setRevendedores((prev) => prev.map((r) => r.id === id ? { ...r, activo: false } : r));
+      toast.success(`"${nombre}" desactivado`);
+      return;
+    }
+
+    if (!confirm(`¿Eliminar a "${nombre}"? Esta acción no se puede deshacer.`)) return;
     const result = await deleteRevendedor(id);
     if (result.error) {
       toast.error(getErrorMessage(result.error));
@@ -464,7 +482,7 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
                           <button onClick={() => openEdit(r)} className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-blue-400 transition-colors">
                             <Edit2 size={14} />
                           </button>
-                          <button onClick={() => handleDeleteRevendedor(r.id)} className="p-1.5 rounded hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors">
+                          <button onClick={() => handleDeleteRevendedor(r.id, `${r.nombre} ${r.apellido}`)} className="p-1.5 rounded hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors">
                             <Trash2 size={14} />
                           </button>
                         </div>

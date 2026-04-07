@@ -148,6 +148,24 @@ export async function createVenta(data: Record<string, unknown>): Promise<Servic
   } catch (e) { return { error: handleError(e) }; }
 }
 
+export async function updateVenta(id: string, data: Record<string, unknown>): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from('ventas').update(data).eq('id', id);
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
+export async function deleteVenta(id: string): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from('ventas').delete().eq('id', id);
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
 // ==================== INSTALACIONES ====================
 export async function createInstalacion(data: Record<string, unknown>): Promise<ServiceResult> {
   try {
