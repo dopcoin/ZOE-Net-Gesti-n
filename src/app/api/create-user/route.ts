@@ -2,14 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
-// Temporal: verificar si la service role key está configurada (no expone el valor)
-export async function GET() {
-  return NextResponse.json({
-    serviceKeyConfigured: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-  });
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Verificar sesión del solicitante (server-side, sin problemas de JWT)
