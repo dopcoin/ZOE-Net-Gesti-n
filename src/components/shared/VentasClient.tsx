@@ -115,10 +115,6 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
       toast.error('Selecciona un producto');
       return;
     }
-    if (form.tipo === 'directa' && !form.cliente_id) {
-      toast.error('Selecciona un cliente para venta directa');
-      return;
-    }
     if (form.tipo === 'revendedor' && !form.revendedor_id) {
       toast.error('Selecciona un revendedor');
       return;
@@ -135,21 +131,16 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
 
     setLoading(true);
 
-    const total = form.cantidad * form.precio_unitario;
-    const ganancia = selectedProduct
-      ? (form.precio_unitario - selectedProduct.precio_compra) * form.cantidad
-      : 0;
-
+    // total y ganancia son columnas GENERATED en el DB — no incluir en payload
     const payload = {
       mercancia_id: form.mercancia_id,
       cantidad: form.cantidad,
       precio_unitario: form.precio_unitario,
       precio_compra_unitario: selectedProduct ? selectedProduct.precio_compra : 0,
-      total,
-      ganancia,
+      descuento: 0,
       tipo: form.tipo,
       estado: 'completada' as EstadoVenta,
-      cliente_id: form.tipo === 'directa' ? form.cliente_id : null,
+      cliente_id: (form.cliente_id && form.cliente_id !== 'generico') ? form.cliente_id : null,
       revendedor_id: form.tipo === 'revendedor' ? form.revendedor_id : null,
       notas: form.notas || null,
     };
@@ -399,13 +390,13 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
 
               {form.tipo === 'directa' ? (
                 <div>
-                  <label className="label">Cliente *</label>
+                  <label className="label">Cliente</label>
                   <select
                     value={form.cliente_id}
                     onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}
                     className="input"
                   >
-                    <option value="">Seleccionar cliente</option>
+                    <option value="generico">— Cliente Genérico (sin cuenta) —</option>
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nombre} {c.apellido}

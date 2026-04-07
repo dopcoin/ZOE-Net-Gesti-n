@@ -96,13 +96,13 @@ export default function ConciliacionClient({
     }
 
     setLoading(true);
+    // 'diferencia' es columna GENERATED (cantidad_real - cantidad_esperada) — no incluir
     const payload = {
       mercancia_id: formData.mercancia_id,
       stock_sistema: formData.stock_sistema,
       stock_fisico: formData.stock_fisico,
       cantidad_esperada: formData.stock_sistema,
       cantidad_real: formData.stock_fisico,
-      diferencia,
       revendedor_id: formData.revendedor_id || null,
       notas: formData.notas || null,
     };

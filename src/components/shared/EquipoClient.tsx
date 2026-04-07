@@ -105,10 +105,15 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
+      // Intentar obtener sesión válida; refrescar si expiró (evita 401)
+      let { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        toast.error('Sesión expirada. Por favor recarga la página.');
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        session = refreshed.session;
+      }
+      if (!session?.access_token) {
+        toast.error('Sesión expirada. Recarga la página e inicia sesión nuevamente.');
+        setLoading(false);
         return;
       }
 

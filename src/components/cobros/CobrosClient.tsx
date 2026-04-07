@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History } from 'lucide-react';
 import type { Cliente, Cobro, EstadoCobro, TipoCobro } from '@/types';
 
 interface Props {
@@ -38,6 +38,12 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   const [formNotas, setFormNotas] = useState('');
   const [formFechaPago, setFormFechaPago] = useState('');
   const [savingModal, setSavingModal] = useState(false);
+
+  // Historial modal
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [historialCliente, setHistorialCliente] = useState<Cliente | null>(null);
+  const [historialCobros, setHistorialCobros] = useState<Cobro[]>([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
 
   const clientesCobros = useMemo<ClienteCobro[]>(() => {
     return clientes.map((cliente) => {
@@ -181,6 +187,28 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   function closeModal() {
     setModalOpen(false);
     setModalData(null);
+  }
+
+  async function openHistorial(cliente: Cliente) {
+    setHistorialCliente(cliente);
+    setHistorialOpen(true);
+    setHistorialLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('cobros')
+      .select('*')
+      .eq('cliente_id', cliente.id)
+      .order('anio', { ascending: false })
+      .order('mes', { ascending: false })
+      .limit(24);
+    setHistorialCobros(data ?? []);
+    setHistorialLoading(false);
+  }
+
+  function closeHistorial() {
+    setHistorialOpen(false);
+    setHistorialCliente(null);
+    setHistorialCobros([]);
   }
 
   async function handleModalSubmit(e: React.FormEvent) {
@@ -378,6 +406,13 @@ export default function CobrosClient({ clientes, cobros }: Props) {
                   >
                     Detalle
                   </button>
+                  <button
+                    onClick={() => openHistorial(cc.cliente)}
+                    className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-blue-400 transition-colors"
+                    title="Ver historial de pagos"
+                  >
+                    <History size={14} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -454,6 +489,56 @@ export default function CobrosClient({ clientes, cobros }: Props) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Historial */}
+      {historialOpen && historialCliente && (
+        <div className="modal-overlay" onClick={closeHistorial}>
+          <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <History size={18} className="text-blue-400" />
+                  Historial de Pagos
+                </h2>
+                <p className="text-sm text-gray-400">{historialCliente.nombre} {historialCliente.apellido} · {historialCliente.plan ?? 'Sin plan'}</p>
+              </div>
+              <button onClick={closeHistorial} className="text-gray-500 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            {historialLoading ? (
+              <div className="py-8 text-center text-gray-500 text-sm">Cargando historial...</div>
+            ) : historialCobros.length === 0 ? (
+              <div className="py-8 text-center text-gray-500 text-sm">No hay registros de pago para este cliente</div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {historialCobros.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-[#1C2333]">
+                    <div>
+                      <span className="text-sm font-medium text-white">
+                        {meses[(c.mes ?? 1) - 1]} {c.anio}
+                      </span>
+                      {c.tipo_pago && (
+                        <span className="ml-2 text-xs text-gray-500 capitalize">{c.tipo_pago}</span>
+                      )}
+                      {c.notas && <p className="text-xs text-gray-500 mt-0.5">{c.notas}</p>}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-white">{formatCurrency(c.monto)}</div>
+                      <span className={`badge text-xs ${estadoCobroColor(c.estado)}`}>{c.estado}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-[#1F2937] flex justify-between items-center">
+              <span className="text-xs text-gray-500">Mostrando últimos 24 meses</span>
+              <button onClick={closeHistorial} className="btn-secondary text-sm">Cerrar</button>
+            </div>
           </div>
         </div>
       )}

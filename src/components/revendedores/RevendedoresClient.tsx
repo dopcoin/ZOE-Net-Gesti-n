@@ -14,12 +14,20 @@ import {
 } from 'lucide-react';
 import type { Revendedor, GananciaRevendedor, Venta, TipoComision } from '@/types';
 
-type Tab = 'revendedores' | 'ganancias' | 'ventas';
+type Tab = 'revendedores' | 'asignacion' | 'ganancias' | 'ventas';
+
+interface MiembroOption {
+  id: string;
+  nombre: string;
+  apellido: string;
+  rol: string;
+}
 
 interface Props {
-  revendedores: Revendedor[];
+  revendedores: (Revendedor & { profiles?: { nombre: string; apellido: string } | null })[];
   ganancias: GananciaRevendedor[];
   ventas: Venta[];
+  miembros: MiembroOption[];
 }
 
 const emptyRevendedor = {
@@ -32,9 +40,11 @@ const emptyRevendedor = {
   monto_fijo_comision: 0,
   activo: true,
   notas: '',
+  responsable_id: '',
+  zona: '',
 };
 
-export default function RevendedoresClient({ revendedores: initialRevendedores, ganancias: initialGanancias, ventas: initialVentas }: Props) {
+export default function RevendedoresClient({ revendedores: initialRevendedores, ganancias: initialGanancias, ventas: initialVentas, miembros }: Props) {
   const supabase = createClient();
 
   const [tab, setTab] = useState<Tab>('revendedores');
@@ -125,7 +135,7 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
     setShowModal(true);
   }
 
-  function openEdit(r: Revendedor) {
+  function openEdit(r: Revendedor & { profiles?: { nombre: string; apellido: string } | null; responsable_id?: string; zona?: string }) {
     setEditingId(r.id);
     setForm({
       nombre: r.nombre,
@@ -137,6 +147,8 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
       monto_fijo_comision: r.monto_fijo_comision ?? 0,
       activo: r.activo,
       notas: r.notas || '',
+      responsable_id: r.responsable_id || '',
+      zona: r.zona || '',
     });
     setShowModal(true);
   }
@@ -157,6 +169,8 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
       monto_fijo_comision: form.tipo_comision !== 'porcentaje' ? form.monto_fijo_comision : null,
       activo: form.activo,
       notas: form.notas.trim() || null,
+      responsable_id: form.responsable_id || null,
+      zona: form.zona.trim() || null,
     };
 
     if (editingId) {
@@ -261,9 +275,27 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
     toast.success('Ganancia manual agregada');
   }
 
+  // --- Asignacion rapida de responsable ---
+  async function handleAsignarResponsable(revendedorId: string, responsableId: string) {
+    const result = await updateRevendedor(revendedorId, { responsable_id: responsableId || null });
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
+    }
+    setRevendedores((prev) =>
+      prev.map((r) =>
+        r.id === revendedorId
+          ? { ...r, responsable_id: responsableId || null }
+          : r
+      )
+    );
+    toast.success('Responsable asignado');
+  }
+
   // --- Render helpers ---
   const tabs: { key: Tab; label: string }[] = [
     { key: 'revendedores', label: 'Revendedores' },
+    { key: 'asignacion', label: 'Asignación' },
     { key: 'ganancias', label: 'Ganancias' },
     { key: 'ventas', label: 'Ventas' },
   ];
@@ -496,6 +528,66 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
         </div>
       )}
 
+      {/* TAB: Asignacion */}
+      {tab === 'asignacion' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Asigna un responsable del equipo a cada revendedor. El responsable es el miembro del equipo que gestiona esa cuenta.</p>
+          <div className="card overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#1F2937]">
+                  <th className="table-header">Revendedor</th>
+                  <th className="table-header">Zona</th>
+                  <th className="table-header">Responsable Asignado</th>
+                  <th className="table-header">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {revendedores.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="table-cell text-center text-gray-500 py-8">
+                      No hay revendedores registrados
+                    </td>
+                  </tr>
+                ) : (
+                  revendedores.map((r) => {
+                    const rev = r as Revendedor & { responsable_id?: string; zona?: string; profiles?: { nombre: string; apellido: string } | null };
+                    return (
+                      <tr key={r.id} className="border-b border-[#1F2937]/50 hover:bg-[#1C2333]/50 transition-colors">
+                        <td className="table-cell font-medium text-white">
+                          {r.nombre} {r.apellido}
+                          {rev.zona && <span className="ml-2 text-xs text-gray-500">({rev.zona})</span>}
+                        </td>
+                        <td className="table-cell text-gray-400 text-sm">{rev.zona || '—'}</td>
+                        <td className="table-cell">
+                          <select
+                            value={rev.responsable_id || ''}
+                            onChange={(e) => handleAsignarResponsable(r.id, e.target.value)}
+                            className="input py-1 text-sm"
+                          >
+                            <option value="">Sin responsable</option>
+                            {miembros.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.nombre} {m.apellido} ({m.rol})
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="table-cell">
+                          <span className={`badge ${r.activo ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                            {r.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* TAB: Ventas */}
       {tab === 'ventas' && (
         <div className="card overflow-hidden">
@@ -623,6 +715,27 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
                     />
                   </div>
                 )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Responsable del Equipo</label>
+                  <select
+                    className="input"
+                    value={form.responsable_id}
+                    onChange={(e) => setForm({ ...form, responsable_id: e.target.value })}
+                  >
+                    <option value="">Sin responsable</option>
+                    {miembros.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nombre} {m.apellido} ({m.rol})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Zona / Sector</label>
+                  <input className="input" value={form.zona} onChange={(e) => setForm({ ...form, zona: e.target.value })} placeholder="Ej: Norte, Santiago..." />
+                </div>
               </div>
               <div>
                 <label className="label">Notas</label>

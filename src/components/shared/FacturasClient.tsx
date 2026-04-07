@@ -194,6 +194,8 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       const itbisAmount = subtotal * (formData.itbis / 100);
       const total = subtotal - formData.descuento + itbisAmount;
 
+      // 'total' es columna GENERATED en DB (precio_unitario * cantidad)
+      // Usamos cantidad=1 y precio_unitario=total_final para que la columna generada sea correcta
       const payload: Record<string, unknown> = {
         numero: formData.numero,
         cliente_id: formData.cliente_id || null,
@@ -201,13 +203,12 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
         subtotal,
         descuento: formData.descuento,
         itbis: formData.itbis,
-        total,
         estado: formData.estado,
         notas: formData.notas || null,
-        // Legacy compatibility columns
-        descripcion: items[0]?.descripcion ?? null,
-        cantidad: items.length,
-        precio_unitario: subtotal,
+        // Columnas legacy que controlan el total generado: precio_unitario * cantidad
+        descripcion: items[0]?.descripcion ?? 'Ver items adjuntos',
+        cantidad: 1,
+        precio_unitario: total, // total final = la columna generada queda = total * 1 = total ✓
       };
 
       if (modalMode === 'create') {
