@@ -6,7 +6,7 @@ export default async function CobrosPage() {
   const { data: clientes } = await supabase
     .from('clientes')
     .select('*')
-    .eq('estado', 'activo')
+    .in('estado', ['activo', 'becado'])
     .order('nombre');
   const { data: cobros } = await supabase
     .from('cobros')

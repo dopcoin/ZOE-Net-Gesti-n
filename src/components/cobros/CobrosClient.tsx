@@ -77,6 +77,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
 
   const stats = useMemo(() => {
     const total = clientesCobros.length;
+    const exonerados = clientesCobros.filter((cc) => cc.estado === 'exonerado').length;
     const pagados = clientesCobros.filter((cc) => cc.estado === 'pagado').length;
     const enMora = clientesCobros.filter((cc) => cc.estado === 'mora').length;
     const totalRecaudado = clientesCobros
@@ -85,8 +86,10 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     const porCobrar = clientesCobros
       .filter((cc) => cc.estado !== 'pagado' && cc.estado !== 'exonerado')
       .reduce((sum, cc) => sum + cc.cliente.monto_mensual, 0);
-    const tasaCobro = total > 0 ? Math.round((pagados / total) * 100) : 0;
-    return { total, pagados, enMora, totalRecaudado, porCobrar, tasaCobro };
+    // Exonerados are resolved — exclude from denominator for tasa de cobro
+    const cobrables = total - exonerados;
+    const tasaCobro = cobrables > 0 ? Math.round((pagados / cobrables) * 100) : 0;
+    return { total, pagados, exonerados, enMora, totalRecaudado, porCobrar, tasaCobro, cobrables };
   }, [clientesCobros]);
 
   function prevMonth() {
@@ -296,7 +299,10 @@ export default function CobrosClient({ clientes, cobros }: Props) {
               <CreditCard size={16} className="text-emerald-400" />
             </div>
           </div>
-          <div className="stat-value">{stats.pagados}/{stats.total}</div>
+          <div className="stat-value">{stats.pagados}/{stats.cobrables}</div>
+          {stats.exonerados > 0 && (
+            <div className="text-xs text-purple-400">{stats.exonerados} exonerados</div>
+          )}
         </div>
         <div className="stat-card">
           <div className="flex items-center justify-between">

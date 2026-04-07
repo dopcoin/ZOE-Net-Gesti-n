@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Cliente, EstadoCliente } from '@/types';
 import { createCliente, updateCliente, deleteCliente, getErrorMessage } from '@/lib/services';
@@ -45,9 +45,10 @@ type FormData = typeof emptyForm;
 
 interface Props {
   clientes: Cliente[];
+  ubicaciones: string[];
 }
 
-export default function ClientesClient({ clientes: initialClientes }: Props) {
+export default function ClientesClient({ clientes: initialClientes, ubicaciones: initialUbicaciones }: Props) {
   const router = useRouter();
 
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
@@ -59,6 +60,14 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'tecnico' | 'notas'>('general');
+  const [showNewUbicacion, setShowNewUbicacion] = useState(false);
+  const [newUbicacion, setNewUbicacion] = useState('');
+
+  // Merge server ubicaciones with any new localidades from local clientes state
+  const allUbicaciones = useMemo(() => {
+    const fromClientes = clientes.map((c) => c.localidad).filter((l): l is string => !!l && l !== 'Sin localidad');
+    return Array.from(new Set([...initialUbicaciones, ...fromClientes])).sort();
+  }, [clientes, initialUbicaciones]);
 
   // --- Modal UX: Escape key + body overflow ---
   const closeModal = useCallback(() => {
@@ -103,6 +112,8 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
     setSelectedCliente(null);
     setModalMode('create');
     setActiveTab('general');
+    setShowNewUbicacion(false);
+    setNewUbicacion('');
     setModalOpen(true);
   };
 
@@ -139,6 +150,8 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
     });
     setModalMode('edit');
     setActiveTab('general');
+    setShowNewUbicacion(false);
+    setNewUbicacion('');
     setModalOpen(true);
   };
 
@@ -475,13 +488,61 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
                 </div>
                 <div>
                   <label className="label">Localidad</label>
-                  <input
-                    name="localidad"
-                    value={formData.localidad ?? ''}
-                    onChange={handleChange}
-                    className="input w-full"
-                    placeholder="Localidad"
-                  />
+                  {showNewUbicacion ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newUbicacion}
+                        onChange={(e) => setNewUbicacion(e.target.value)}
+                        className="input w-full"
+                        placeholder="Nueva ubicación..."
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newUbicacion.trim()) {
+                            setFormData((prev) => ({ ...prev, localidad: newUbicacion.trim() }));
+                          }
+                          setShowNewUbicacion(false);
+                          setNewUbicacion('');
+                        }}
+                        className="btn-primary text-xs px-3 whitespace-nowrap"
+                      >
+                        OK
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewUbicacion(false); setNewUbicacion(''); }}
+                        className="btn-secondary text-xs px-3"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        name="localidad"
+                        value={formData.localidad ?? ''}
+                        onChange={handleChange}
+                        className="input w-full"
+                      >
+                        <option value="">— Sin localidad —</option>
+                        {allUbicaciones.map((loc) => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewUbicacion(true)}
+                        className="btn-secondary text-xs px-3 whitespace-nowrap flex items-center gap-1"
+                        title="Registrar nueva ubicación"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Nueva
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="label">Plan</label>

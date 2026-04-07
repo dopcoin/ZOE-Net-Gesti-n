@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createTarea, updateTarea, deleteTarea, toggleTarea, getErrorMessage } from '@/lib/services';
 import { formatDate, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Plus, Search, X, CheckSquare, Square, AlertTriangle } from 'lucide-react';
+import { Plus, Search, X, CheckSquare, Square, AlertTriangle, ChevronDown, ChevronRight, History } from 'lucide-react';
 import type { Tarea, Equipo, Prioridad, Profile } from '@/types';
 
 interface MiembroOption {
@@ -68,6 +68,7 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
   const [editing, setEditing] = useState<Tarea | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
+  const [showPasadas, setShowPasadas] = useState(false);
 
   const equipos: Equipo[] = ['soporte', 'financiero', 'administrativo'];
 
@@ -103,7 +104,10 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
     ? tareas.filter((t) => t.asignado_a === userId && !t.completada).length
     : 0;
 
-  const filtered = tareas.filter((t) => {
+  const tareasActivas = tareas.filter((t) => !t.completada);
+  const tareasCompletadas = tareas.filter((t) => t.completada);
+
+  const filtered = tareasActivas.filter((t) => {
     const matchEquipo = filtroEquipo === 'todos' || t.equipo === filtroEquipo;
     const matchSearch =
       search === '' ||
@@ -197,7 +201,11 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
       setTareas((prev) =>
         prev.map((t) => (t.id === tarea.id ? { ...t, completada: newValue } : t))
       );
-      toast.success(newValue ? 'Tarea completada' : 'Tarea marcada como pendiente');
+      if (newValue) {
+        toast.success('Tarea completada — movida a Tareas Pasadas');
+      } else {
+        toast.success('Tarea restaurada a pendiente');
+      }
     }
   }
 
@@ -367,8 +375,8 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
             {eq === 'todos' ? 'Todos' : equipoLabels[eq as Equipo]}
             <span className="ml-1.5 text-xs opacity-70">
               {eq === 'todos'
-                ? tareas.length
-                : tareas.filter((t) => t.equipo === eq).length}
+                ? tareasActivas.length
+                : tareasActivas.filter((t) => t.equipo === eq).length}
             </span>
           </button>
         ))}
@@ -407,6 +415,100 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
       <div className="space-y-6">
         {equipos.map((equipo) => renderEquipoSection(equipo))}
       </div>
+
+      {/* Tareas Pasadas (completadas) */}
+      {tareasCompletadas.length > 0 && (
+        <div className="card border border-[#1F2937] overflow-hidden">
+          <button
+            onClick={() => setShowPasadas((v) => !v)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#1C2333] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <History size={18} className="text-gray-400" />
+              <h2 className="font-semibold text-gray-400">
+                Tareas Pasadas
+                <span className="ml-2 text-xs text-gray-500">({tareasCompletadas.length})</span>
+              </h2>
+            </div>
+            {showPasadas ? (
+              <ChevronDown size={18} className="text-gray-500" />
+            ) : (
+              <ChevronRight size={18} className="text-gray-500" />
+            )}
+          </button>
+          {showPasadas && (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#1F2937]">
+                  <th className="table-header w-10"></th>
+                  <th className="table-header">Titulo</th>
+                  <th className="table-header">Equipo</th>
+                  <th className="table-header">Asignado</th>
+                  <th className="table-header">Cliente</th>
+                  <th className="table-header">Prioridad</th>
+                  <th className="table-header w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tareasCompletadas.map((tarea) => (
+                  <tr
+                    key={tarea.id}
+                    className="border-b border-[#1F2937]/50 hover:bg-[#1C2333]/50 transition-colors opacity-60"
+                  >
+                    <td className="table-cell">
+                      <button
+                        onClick={() => handleToggle(tarea)}
+                        className="text-gray-400 hover:text-white transition-colors"
+                        title="Restaurar tarea"
+                      >
+                        <CheckSquare size={18} className="text-emerald-400" />
+                      </button>
+                    </td>
+                    <td className="table-cell">
+                      <span className="line-through text-gray-500">{tarea.titulo}</span>
+                      {tarea.descripcion && (
+                        <p className="text-xs text-gray-600 truncate max-w-xs mt-0.5">
+                          {tarea.descripcion}
+                        </p>
+                      )}
+                    </td>
+                    <td className="table-cell">
+                      <span className={`text-xs ${equipoColors[tarea.equipo]?.header ?? 'text-gray-500'}`}>
+                        {equipoLabels[tarea.equipo] ?? tarea.equipo}
+                      </span>
+                    </td>
+                    <td className="table-cell text-sm text-gray-500">
+                      {tarea.profiles
+                        ? `${tarea.profiles.nombre} ${tarea.profiles.apellido}`
+                        : '\u2014'}
+                    </td>
+                    <td className="table-cell text-sm text-gray-500">
+                      {tarea.clientes
+                        ? `${tarea.clientes.nombre} ${tarea.clientes.apellido}`
+                        : '\u2014'}
+                    </td>
+                    <td className="table-cell">
+                      <span className={`badge ${prioridadColor(tarea.prioridad)}`}>
+                        {tarea.prioridad}
+                      </span>
+                    </td>
+                    <td className="table-cell">
+                      {canDeleteTarea(tarea) ? (
+                        <button
+                          onClick={() => handleDelete(tarea.id)}
+                          className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors text-xs"
+                        >
+                          &#x2715;
+                        </button>
+                      ) : <span />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
