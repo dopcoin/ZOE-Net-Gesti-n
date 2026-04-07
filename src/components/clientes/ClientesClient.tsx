@@ -12,6 +12,8 @@ const ESTADOS: EstadoCliente[] = ['activo', 'inactivo', 'nuevo', 'becado', 'susp
 
 // Only DB-valid columns (excluding id, created_at, updated_at which are auto-managed)
 const emptyForm = {
+  beca: false,
+  beca_descripcion: null as string | null,
   nombre: '',
   apellido: '',
   cedula: null as string | null,
@@ -107,6 +109,8 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
   const openEdit = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setFormData({
+      beca: cliente.beca ?? false,
+      beca_descripcion: cliente.beca_descripcion ?? null,
       nombre: cliente.nombre,
       apellido: cliente.apellido,
       cedula: cliente.cedula,
@@ -154,6 +158,8 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
   // --- Build payload with only valid DB columns (strip nulls and special types) ---
   const buildPayload = (): Record<string, unknown> => {
     const raw: Record<string, unknown> = {
+      beca: formData.beca,
+      beca_descripcion: formData.beca_descripcion,
       nombre: formData.nombre,
       apellido: formData.apellido || '',
       cedula: formData.cedula,
@@ -186,6 +192,7 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
     payload.localidad = raw.localidad;
     payload.estado = raw.estado;
     payload.monto_mensual = raw.monto_mensual;
+    payload.beca = formData.beca; // boolean — must always be included even if false
     return payload;
   };
 
@@ -511,6 +518,35 @@ export default function ClientesClient({ clientes: initialClientes }: Props) {
                       </option>
                     ))}
                   </select>
+                </div>
+                {/* Beca toggle - full width */}
+                <div className="md:col-span-2 border-t border-[#1F2937] pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-gray-200">Cliente Becado</span>
+                      <p className="text-xs text-gray-500">No paga o paga tarifa reducida</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, beca: !prev.beca }))}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${
+                        formData.beca ? 'bg-purple-600' : 'bg-[#1C2333] border border-[#1F2937]'
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                        formData.beca ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </button>
+                  </div>
+                  {formData.beca && (
+                    <input
+                      name="beca_descripcion"
+                      value={formData.beca_descripcion ?? ''}
+                      onChange={handleChange}
+                      className="input w-full mt-2"
+                      placeholder="Motivo de la beca (opcional)"
+                    />
+                  )}
                 </div>
               </div>
             )}

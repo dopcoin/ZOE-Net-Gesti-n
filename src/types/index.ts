@@ -2,7 +2,7 @@ export type Rol = 'admin' | 'soporte' | 'financiero' | 'administrativo';
 
 export type EstadoCliente = 'activo' | 'inactivo' | 'nuevo' | 'becado' | 'suspendido';
 
-export type EstadoCobro = 'pagado' | 'pendiente' | 'mora';
+export type EstadoCobro = 'pagado' | 'pendiente' | 'mora' | 'exonerado' | 'parcial';
 
 export type TipoCobro = 'efectivo' | 'transferencia' | 'tarjeta' | 'otro';
 
@@ -18,7 +18,7 @@ export type EstadoVenta = 'completada' | 'pendiente' | 'cancelada';
 
 export type TipoMovimiento = 'ingreso' | 'egreso';
 
-export type EstadoFactura = 'pendiente' | 'pagada' | 'vencida' | 'cancelada';
+export type EstadoFactura = 'emitida' | 'pendiente' | 'pagada' | 'vencida' | 'anulada' | 'cancelada';
 
 export type Equipo = 'soporte' | 'financiero' | 'administrativo';
 
@@ -48,6 +48,8 @@ export interface Cliente {
   plan: string | null;
   monto_mensual: number;
   estado: EstadoCliente;
+  beca: boolean;
+  beca_descripcion: string | null;
   fecha_instalacion: string | null;
   nombre_red: string | null;
   password_router: string | null;

@@ -50,7 +50,9 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       const cobro = cobros.find(
         (c) => c.cliente_id === cliente.id && c.mes === currentMonth && c.anio === currentYear
       ) ?? null;
-      const estado: EstadoCobro = cobro ? cobro.estado : 'pendiente';
+      // Becados default to exonerado if no cobro registered
+      const defaultEstado: EstadoCobro = (cliente.beca || cliente.estado === 'becado') ? 'exonerado' : 'pendiente';
+      const estado: EstadoCobro = cobro ? cobro.estado : defaultEstado;
       return { cliente, cobro, estado };
     });
   }, [clientes, cobros, currentMonth, currentYear]);
@@ -71,7 +73,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       .filter((cc) => cc.estado === 'pagado' && cc.cobro)
       .reduce((sum, cc) => sum + (cc.cobro?.monto ?? 0), 0);
     const porCobrar = clientesCobros
-      .filter((cc) => cc.estado !== 'pagado')
+      .filter((cc) => cc.estado !== 'pagado' && cc.estado !== 'exonerado')
       .reduce((sum, cc) => sum + cc.cliente.monto_mensual, 0);
     const tasaCobro = total > 0 ? Math.round((pagados / total) * 100) : 0;
     return { total, pagados, enMora, totalRecaudado, porCobrar, tasaCobro };
@@ -358,6 +360,9 @@ export default function CobrosClient({ clientes, cobros }: Props) {
                   <span className="font-medium text-white">
                     {cc.cliente.nombre} {cc.cliente.apellido}
                   </span>
+                  {(cc.cliente.beca || cc.cliente.estado === 'becado') && (
+                    <span className="ml-2 badge bg-purple-500/20 text-purple-400 text-xs">Becado</span>
+                  )}
                   <span className="md:hidden text-xs text-gray-500 ml-2">
                     {cc.cliente.plan ?? 'Sin plan'}
                   </span>
@@ -382,23 +387,33 @@ export default function CobrosClient({ clientes, cobros }: Props) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 md:justify-end">
-                  {cc.estado !== 'pagado' && (
-                    <>
+                  {cc.estado !== 'pagado' && cc.estado !== 'exonerado' && (
+                    (cc.cliente.beca || cc.cliente.estado === 'becado') ? (
                       <button
-                        onClick={() => handleQuickPay(cc)}
-                        disabled={loading === `pay-${cc.cliente.id}`}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                        onClick={() => upsertCobro(cc.cliente.id, 'exonerado', 0, null, 'Beca aplicada', null, cc.cobro?.id).then(() => { toast.success('Cobro exonerado'); router.refresh(); }).catch(() => toast.error('Error al exonerar'))}
+                        disabled={!!loading}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-50"
                       >
-                        {loading === `pay-${cc.cliente.id}` ? '...' : 'Pagar'}
+                        Exonerar
                       </button>
-                      <button
-                        onClick={() => handleQuickMora(cc)}
-                        disabled={loading === `mora-${cc.cliente.id}`}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
-                      >
-                        {loading === `mora-${cc.cliente.id}` ? '...' : 'Mora'}
-                      </button>
-                    </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleQuickPay(cc)}
+                          disabled={loading === `pay-${cc.cliente.id}`}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                        >
+                          {loading === `pay-${cc.cliente.id}` ? '...' : 'Pagar'}
+                        </button>
+                        <button
+                          onClick={() => handleQuickMora(cc)}
+                          disabled={loading === `mora-${cc.cliente.id}`}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                        >
+                          {loading === `mora-${cc.cliente.id}` ? '...' : 'Mora'}
+                        </button>
+                      </>
+                    )
                   )}
                   <button
                     onClick={() => openModal(cc)}

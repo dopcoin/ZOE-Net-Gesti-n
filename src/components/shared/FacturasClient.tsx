@@ -31,7 +31,7 @@ interface Props {
   clientes: ClienteOption[];
 }
 
-const ESTADOS: EstadoFactura[] = ['pendiente', 'pagada', 'vencida', 'cancelada'];
+const ESTADOS: EstadoFactura[] = ['emitida', 'pendiente', 'pagada', 'vencida', 'anulada', 'cancelada'];
 
 const emptyItem: FacturaItem = {
   descripcion: '',
@@ -46,7 +46,7 @@ const emptyForm = {
   items: [{ ...emptyItem }] as FacturaItem[],
   descuento: 0,
   itbis: 18,
-  estado: 'pendiente' as EstadoFactura,
+  estado: 'emitida' as EstadoFactura,
   notas: '',
 };
 

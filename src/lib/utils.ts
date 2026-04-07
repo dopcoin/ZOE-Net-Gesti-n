@@ -45,6 +45,8 @@ export function estadoCobroColor(estado: EstadoCobro): string {
     pagado: 'bg-emerald-500/20 text-emerald-400',
     pendiente: 'bg-yellow-500/20 text-yellow-400',
     mora: 'bg-red-500/20 text-red-400',
+    exonerado: 'bg-purple-500/20 text-purple-400',
+    parcial: 'bg-blue-500/20 text-blue-400',
   };
   return map[estado] || 'bg-gray-500/20 text-gray-400';
 }
@@ -61,9 +63,11 @@ export function estadoInstalacionColor(estado: EstadoInstalacion): string {
 
 export function estadoFacturaColor(estado: EstadoFactura): string {
   const map: Record<EstadoFactura, string> = {
+    emitida: 'bg-blue-500/20 text-blue-400',
     pendiente: 'bg-yellow-500/20 text-yellow-400',
     pagada: 'bg-emerald-500/20 text-emerald-400',
     vencida: 'bg-red-500/20 text-red-400',
+    anulada: 'bg-gray-500/20 text-gray-400',
     cancelada: 'bg-gray-500/20 text-gray-400',
   };
   return map[estado] || 'bg-gray-500/20 text-gray-400';
