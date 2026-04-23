@@ -43,12 +43,15 @@ const emptyForm = {
 
 type FormData = typeof emptyForm;
 
+const DEFAULT_MEDIOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque'];
+
 interface Props {
   clientes: Cliente[];
   ubicaciones: string[];
+  mediosPago: string[];
 }
 
-export default function ClientesClient({ clientes: initialClientes, ubicaciones: initialUbicaciones }: Props) {
+export default function ClientesClient({ clientes: initialClientes, ubicaciones: initialUbicaciones, mediosPago: initialMediosPago }: Props) {
   const router = useRouter();
 
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
@@ -62,12 +65,22 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
   const [activeTab, setActiveTab] = useState<'general' | 'tecnico' | 'notas'>('general');
   const [showNewUbicacion, setShowNewUbicacion] = useState(false);
   const [newUbicacion, setNewUbicacion] = useState('');
+  const [showNewMedioPago, setShowNewMedioPago] = useState(false);
+  const [newMedioPago, setNewMedioPago] = useState('');
 
   // Merge server ubicaciones with any new localidades from local clientes state
   const allUbicaciones = useMemo(() => {
     const fromClientes = clientes.map((c) => c.localidad).filter((l): l is string => !!l && l !== 'Sin localidad');
     return Array.from(new Set([...initialUbicaciones, ...fromClientes])).sort();
   }, [clientes, initialUbicaciones]);
+
+  // Merge default + server + local medios de pago
+  const allMediosPago = useMemo(() => {
+    const fromClientes = clientes
+      .map((c) => (c as unknown as Record<string, unknown>).tipo_pago as string | null)
+      .filter((v): v is string => !!v);
+    return Array.from(new Set([...DEFAULT_MEDIOS_PAGO, ...initialMediosPago, ...fromClientes])).sort();
+  }, [clientes, initialMediosPago]);
 
   // --- Modal UX: Escape key + body overflow ---
   const closeModal = useCallback(() => {
@@ -321,7 +334,7 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
             <thead>
               <tr className="border-b border-[#1F2937]">
                 <th className="table-header">Nombre</th>
-                <th className="table-header">Plan</th>
+                <th className="table-header">Medio de Pago</th>
                 <th className="table-header">Monto</th>
                 <th className="table-header">Estado</th>
                 <th className="table-header">Localidad</th>
@@ -346,7 +359,9 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                     <td className="table-cell font-medium text-gray-100">
                       {cliente.nombre} {cliente.apellido}
                     </td>
-                    <td className="table-cell text-gray-300">{cliente.plan ?? '—'}</td>
+                    <td className="table-cell text-gray-300">
+                      {(cliente as unknown as Record<string, unknown>).tipo_pago as string ?? '—'}
+                    </td>
                     <td className="table-cell text-gray-300">
                       {formatCurrency(cliente.monto_mensual)}
                     </td>
@@ -549,14 +564,62 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                   )}
                 </div>
                 <div>
-                  <label className="label">Plan</label>
-                  <input
-                    name="plan"
-                    value={formData.plan ?? ''}
-                    onChange={handleChange}
-                    className="input w-full"
-                    placeholder="Ej: 10 Mbps"
-                  />
+                  <label className="label">Medio de Pago</label>
+                  {showNewMedioPago ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMedioPago}
+                        onChange={(e) => setNewMedioPago(e.target.value)}
+                        className="input w-full"
+                        placeholder="Nuevo medio de pago..."
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newMedioPago.trim()) {
+                            setFormData((prev) => ({ ...prev, tipo_pago: newMedioPago.trim() }));
+                          }
+                          setShowNewMedioPago(false);
+                          setNewMedioPago('');
+                        }}
+                        className="btn-primary text-xs px-3 whitespace-nowrap"
+                      >
+                        OK
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewMedioPago(false); setNewMedioPago(''); }}
+                        className="btn-secondary text-xs px-3"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        name="tipo_pago"
+                        value={formData.tipo_pago ?? ''}
+                        onChange={handleChange}
+                        className="input w-full"
+                      >
+                        <option value="">— Sin medio de pago —</option>
+                        {allMediosPago.map((mp) => (
+                          <option key={mp} value={mp}>{mp}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewMedioPago(true)}
+                        className="btn-secondary text-xs px-3 whitespace-nowrap flex items-center gap-1"
+                        title="Agregar nuevo medio de pago"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Nuevo
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="label">Monto Mensual</label>
@@ -629,6 +692,16 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
             {/* Tab: Tecnico */}
             {activeTab === 'tecnico' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Plan de Servicio</label>
+                  <input
+                    name="plan"
+                    value={formData.plan ?? ''}
+                    onChange={handleChange}
+                    className="input w-full"
+                    placeholder="Ej: 10 Mbps"
+                  />
+                </div>
                 <div>
                   <label className="label">Nombre de Red</label>
                   <input

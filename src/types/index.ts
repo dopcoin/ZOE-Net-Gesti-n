@@ -185,6 +185,7 @@ export interface Factura {
 
 export interface LibroDiario {
   id: string;
+  fecha: string | null;
   tipo: TipoMovimiento;
   categoria: string;
   descripcion: string;
