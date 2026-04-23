@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      // Method 2: Check for hash fragments (Supabase implicit redirect)
+      // Method 2: Check for hash fragments (Supabase email link redirect)
       if (window.location.hash) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
           if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
@@ -81,11 +81,16 @@ export default function ResetPasswordPage() {
         return () => subscription.unsubscribe();
       }
 
-      // Method 3: Check for existing session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setSessionReady(true);
+      // Method 3: Check if user arrived here via auth/callback (PKCE recovery flow)
+      // Only allow if there's a session AND we came from the callback (referrer check)
+      const cameFromCallback = document.referrer.includes('/auth/callback');
+      if (cameFromCallback) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSessionReady(true);
+        }
       }
+      // If user just navigates to /reset-password while logged in, don't show the form
       setVerifying(false);
     }
 
