@@ -464,32 +464,36 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Tipo de Venta</label>
-                  <select
-                    value={form.tipo}
-                    onChange={(e) => setForm({ ...form, tipo: e.target.value as TipoVenta, cliente_id: '', revendedor_id: '' })}
-                    className="input"
+              {/* Tipo de venta — toggle prominente */}
+              <div>
+                <label className="label">Tipo de Venta</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, tipo: 'directa', revendedor_id: '' })}
+                    className={`py-2.5 px-4 rounded-lg text-sm font-medium border transition-all ${
+                      form.tipo === 'directa'
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-[#1C2333] border-[#2A3142] text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                    }`}
                   >
-                    <option value="directa">Directa</option>
-                    <option value="revendedor">Revendedor</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Estado</label>
-                  <select
-                    value={form.estado}
-                    onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoVenta })}
-                    className="input"
+                    Venta Directa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, tipo: 'revendedor', cliente_id: '' })}
+                    className={`py-2.5 px-4 rounded-lg text-sm font-medium border transition-all ${
+                      form.tipo === 'revendedor'
+                        ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/20'
+                        : 'bg-[#1C2333] border-[#2A3142] text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                    }`}
                   >
-                    <option value="completada">Completada</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="cancelada">Cancelada</option>
-                  </select>
+                    Por Revendedor
+                  </button>
                 </div>
               </div>
 
+              {/* Cliente o Revendedor según tipo */}
               {form.tipo === 'directa' ? (
                 <div>
                   <label className="label">Cliente</label>
@@ -505,12 +509,12 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
                   </select>
                 </div>
               ) : (
-                <div>
-                  <label className="label">Revendedor *</label>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                  <label className="label text-purple-300">Revendedor *</label>
                   <select
                     value={form.revendedor_id}
                     onChange={(e) => setForm({ ...form, revendedor_id: e.target.value })}
-                    className="input"
+                    className="input border-purple-500/30 focus:border-purple-500"
                   >
                     <option value="">Seleccionar revendedor</option>
                     {revendedores.map((r) => (
@@ -519,6 +523,19 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
                   </select>
                 </div>
               )}
+
+              <div>
+                <label className="label">Estado</label>
+                <select
+                  value={form.estado}
+                  onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoVenta })}
+                  className="input"
+                >
+                  <option value="completada">Completada</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
 
               <div>
                 <label className="label">Notas</label>

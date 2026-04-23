@@ -211,8 +211,8 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       costo: form.costo || 0,
       estado_cobro: form.estado_cobro,
       descripcion_cobro: form.descripcion_cobro || null,
-      metodo_pago: form.estado_cobro === 'pagado' ? (form.metodo_pago || null) : null,
-      recibido_en: form.estado_cobro === 'pagado' ? (form.recibido_en || null) : null,
+      metodo_pago: form.estado_cobro !== 'sin_costo' ? (form.metodo_pago || null) : null,
+      recibido_en: form.estado_cobro !== 'sin_costo' ? (form.recibido_en || null) : null,
     };
 
     if (editing) {
@@ -538,8 +538,8 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                   </div>
                 )}
 
-                {/* Método de pago + Recibido por — solo cuando está pagado */}
-                {form.estado_cobro === 'pagado' && (
+                {/* Método de pago + Recibido por — cuando hay cobro (pendiente o pagado) */}
+                {form.estado_cobro !== 'sin_costo' && (
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div>
                       <label className="label">Método de pago <span className="text-gray-600">(opcional)</span></label>
