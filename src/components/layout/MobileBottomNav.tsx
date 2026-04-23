@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import {
-  LayoutDashboard, CreditCard, PiggyBank, Users, Menu,
+  LayoutDashboard, CreditCard, PiggyBank, BookOpen, Menu,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '@/store/appStore';
@@ -20,8 +20,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard, roles: ['admin', 'soporte', 'financiero', 'administrativo'] },
   { href: '/cobros', label: 'Cobros', icon: CreditCard, roles: ['admin', 'financiero'] },
+  { href: '/libro-diario', label: 'Libro', icon: BookOpen, roles: ['admin', 'financiero'] },
   { href: '/finanzas', label: 'Finanzas', icon: PiggyBank, roles: ['admin', 'financiero'] },
-  { href: '/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'soporte'] },
 ];
 
 export default function MobileBottomNav() {

@@ -12,6 +12,7 @@ import {
   Plus, ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
   DollarSign, Edit2, Trash2, X, BookOpen,
 } from 'lucide-react';
+import PageHeader from '@/components/shared/PageHeader';
 
 const DEFAULT_CATEGORIAS_ENTRADA = ['Cobros clientes', 'Servicios adicionales', 'Instalaciones', 'Otros ingresos'];
 const DEFAULT_CATEGORIAS_SALIDA = ['Infraestructura', 'Salarios', 'Equipos', 'Servicios externos', 'Mantenimiento', 'Otros gastos'];
@@ -251,23 +252,21 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
 
   return (
     <div className="space-y-5 sm:space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="hidden sm:flex items-center gap-3 min-w-0">
-          <div className="p-2 rounded-lg bg-blue-500/10 flex-shrink-0">
-            <BookOpen className="h-5 w-5 text-blue-400" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-gray-100">Libro Diario</h1>
-            <p className="text-xs sm:text-sm text-gray-500">Control de entradas y salidas</p>
-          </div>
-        </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2 ml-auto">
-          <Plus className="h-4 w-4" />
-          <span className="hidden xs:inline">Nuevo Registro</span>
-          <span className="inline xs:hidden">Nuevo</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Libro Diario"
+        subtitle="Control de entradas y salidas"
+        icon={BookOpen}
+        iconColor="text-blue-400"
+        iconBg="bg-blue-500/10"
+        actions={
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden xs:inline">Nuevo Registro</span>
+            <span className="inline xs:hidden">Nuevo</span>
+          </button>
+        }
+      />
+
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

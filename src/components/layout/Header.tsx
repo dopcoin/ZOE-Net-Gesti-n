@@ -4,24 +4,25 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import { createClient } from '@/lib/supabase/client';
+import { APP_VERSION } from '@/lib/version';
 import { Menu, LogOut, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 
-const routeTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/clientes': 'Clientes',
-  '/cobros': 'Cobros',
-  '/inventario': 'Inventario',
-  '/revendedores': 'Revendedores',
-  '/instalaciones': 'Instalaciones',
-  '/ventas': 'Ventas',
-  '/conciliacion': 'Conciliación',
-  '/facturas': 'Facturas',
-  '/libro-diario': 'Libro Diario',
-  '/finanzas': 'Finanzas',
-  '/tareas': 'Tareas',
-  '/equipo': 'Equipo',
-  '/reportes': 'Reportes',
+const routeMeta: Record<string, { title: string; group?: string }> = {
+  '/dashboard':      { title: 'Dashboard',    group: 'Resumen' },
+  '/finanzas':       { title: 'Finanzas',     group: 'Resumen' },
+  '/reportes':       { title: 'Reportes',     group: 'Resumen' },
+  '/clientes':       { title: 'Clientes',     group: 'Operaciones' },
+  '/instalaciones':  { title: 'Instalaciones', group: 'Operaciones' },
+  '/tareas':         { title: 'Tareas',       group: 'Operaciones' },
+  '/cobros':         { title: 'Cobros',       group: 'Ventas & Cobros' },
+  '/facturas':       { title: 'Facturas',     group: 'Ventas & Cobros' },
+  '/ventas':         { title: 'Ventas',       group: 'Ventas & Cobros' },
+  '/revendedores':   { title: 'Revendedores', group: 'Ventas & Cobros' },
+  '/inventario':     { title: 'Inventario',   group: 'Inventario' },
+  '/conciliacion':   { title: 'Conciliación', group: 'Inventario' },
+  '/libro-diario':   { title: 'Libro Diario', group: 'Contabilidad' },
+  '/equipo':         { title: 'Equipo',       group: 'Sistema' },
 };
 
 export default function Header() {
@@ -30,7 +31,7 @@ export default function Header() {
   const { profile, logout } = useAuthStore();
   const { toggleSidebar, sidebarCollapsed } = useAppStore();
 
-  const pageTitle = routeTitles[pathname] || 'ZOE Net';
+  const meta = routeMeta[pathname] || { title: 'ZOE Net', group: undefined };
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -54,16 +55,35 @@ export default function Header() {
           >
             <Menu size={22} />
           </button>
-          {/* Mobile: page title; Desktop: brand */}
-          <h1 className="lg:hidden text-base font-bold text-white truncate">
-            {pageTitle}
-          </h1>
-          <span className="hidden lg:block text-sm text-gray-400">
-            ZOE Net Gestión
-          </span>
+          {/* Mobile: page title + group breadcrumb */}
+          <div className="lg:hidden min-w-0">
+            {meta.group && (
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest leading-tight truncate">
+                {meta.group}
+              </div>
+            )}
+            <h1 className="text-sm font-bold text-white truncate leading-tight">
+              {meta.title}
+            </h1>
+          </div>
+          {/* Desktop: breadcrumb with group → title */}
+          <div className="hidden lg:flex items-center gap-2 text-sm">
+            {meta.group && (
+              <>
+                <span className="text-gray-500">{meta.group}</span>
+                <span className="text-gray-700">/</span>
+              </>
+            )}
+            <span className="text-white font-semibold">{meta.title}</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Version badge — visible en desktop */}
+          <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-md bg-[#1C2333] border border-[#1F2937] text-[10px] font-mono text-gray-500">
+            v{APP_VERSION}
+          </span>
+
           <button
             className="p-2 rounded-lg hover:bg-[#1C2333] text-gray-400 active:scale-95 transition-transform"
             aria-label="Notificaciones"
