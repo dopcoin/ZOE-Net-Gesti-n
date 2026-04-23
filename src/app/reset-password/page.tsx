@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Wifi, Eye, EyeOff, CheckCircle, KeyRound } from 'lucide-react';
+import { Wifi, Eye, EyeOff, CheckCircle, KeyRound, Loader2 } from 'lucide-react';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -12,30 +12,84 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const email = params.get('email');
     const supabase = createClient();
 
-    // Listen for auth state changes (PASSWORD_RECOVERY event from token exchange)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        setSessionReady(true);
-      }
-    });
+    async function verifyToken() {
+      // Method 1: We have a token from our recovery flow
+      if (token) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery',
+        });
 
-    // Also check if there's already a session (user arrived via auth/callback)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (verifyError) {
+          console.error('verifyOtp error:', verifyError.message);
+          // Try with email if token_hash fails
+          if (email) {
+            const { error: err2 } = await supabase.auth.verifyOtp({
+              email,
+              token,
+              type: 'recovery',
+            });
+            if (!err2) {
+              setSessionReady(true);
+              setVerifying(false);
+              return;
+            }
+            console.error('verifyOtp with email error:', err2.message);
+          }
+          setError('El enlace ha expirado o es inválido. Solicita uno nuevo.');
+          setVerifying(false);
+          return;
+        }
+
+        setSessionReady(true);
+        setVerifying(false);
+        return;
+      }
+
+      // Method 2: Check for hash fragments (Supabase implicit redirect)
+      if (window.location.hash) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+          if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+            setSessionReady(true);
+            setVerifying(false);
+          }
+        });
+
+        // Give it a moment to process the hash
+        setTimeout(() => {
+          if (!sessionReady) {
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (session) {
+                setSessionReady(true);
+              }
+              setVerifying(false);
+            });
+          }
+        }, 2000);
+
+        return () => subscription.unsubscribe();
+      }
+
+      // Method 3: Check for existing session
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setSessionReady(true);
       }
-    });
+      setVerifying(false);
+    }
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    verifyToken();
   }, []);
 
   const handleReset = async (e: React.FormEvent) => {
@@ -65,7 +119,6 @@ export default function ResetPasswordPage() {
       } else {
         setSuccess(true);
         toast.success('Contraseña actualizada exitosamente');
-        // Redirect to dashboard after 2 seconds
         setTimeout(() => {
           router.push('/dashboard');
           router.refresh();
@@ -101,18 +154,24 @@ export default function ResetPasswordPage() {
                 Tu contraseña ha sido cambiada exitosamente. Redirigiendo al dashboard...
               </p>
             </div>
+          ) : verifying ? (
+            <div className="text-center space-y-3 py-4">
+              <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto" />
+              <h2 className="text-lg font-semibold text-white">Verificando enlace...</h2>
+              <p className="text-sm text-gray-400">Un momento por favor.</p>
+            </div>
           ) : !sessionReady ? (
             <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500/10 mx-auto">
-                <KeyRound className="w-6 h-6 text-yellow-400" />
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 mx-auto">
+                <KeyRound className="w-6 h-6 text-red-400" />
               </div>
-              <h2 className="text-lg font-semibold text-white">Verificando enlace...</h2>
+              <h2 className="text-lg font-semibold text-white">Enlace Inválido</h2>
               <p className="text-sm text-gray-400">
-                Si este enlace ha expirado o es inválido, solicita uno nuevo desde la página de inicio de sesión.
+                {error || 'Este enlace ha expirado o es inválido. Solicita uno nuevo desde la página de inicio de sesión.'}
               </p>
               <button
                 onClick={() => router.push('/login')}
-                className="btn-secondary text-sm"
+                className="btn-primary text-sm"
               >
                 Ir al inicio de sesión
               </button>

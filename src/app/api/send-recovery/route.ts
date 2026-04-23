@@ -44,14 +44,25 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // The action_link is in the response even if email sending failed
-    const actionLink = data?.action_link;
+    const actionLink = data?.action_link as string | undefined;
     console.log('[send-recovery] Got action_link:', !!actionLink);
 
-    return NextResponse.json({
-      success: true,
-      recoveryLink: actionLink || null
-    });
+    if (actionLink) {
+      // Extract token from the action_link and build our own direct URL
+      // action_link format: https://xxx.supabase.co/auth/v1/verify?token=TOKEN&type=recovery&redirect_to=...
+      const url = new URL(actionLink);
+      const token = url.searchParams.get('token');
+
+      // Build direct link to our reset-password page with the token
+      const recoveryUrl = `${origin}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+
+      return NextResponse.json({
+        success: true,
+        recoveryLink: recoveryUrl
+      });
+    }
+
+    return NextResponse.json({ success: true, recoveryLink: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[send-recovery] Catch error:', message);
