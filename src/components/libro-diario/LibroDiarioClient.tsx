@@ -195,27 +195,49 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
       const result = await deleteRegistroDiario(r.id);
       if (result.error) { toast.error('Error al eliminar'); return; }
 
-      // Si tiene origen vinculado → revertir estado de pago en el origen
+      // Si tiene origen vinculado → eliminar/revertir el origen
       if (r.origen_id && r.origen_tipo) {
         const supabase = createClient();
-        if (r.origen_tipo === 'cobro') {
+        let actionMsg = '';
+
+        if (r.origen_tipo === 'instalacion') {
+          // Eliminar instalación completa
+          await supabase.from('instalaciones').delete().eq('id', r.origen_id);
+          actionMsg = 'Instalación eliminada';
+        } else if (r.origen_tipo === 'venta') {
+          // Para ventas: restaurar stock primero, luego eliminar venta
+          const { data: venta } = await supabase
+            .from('ventas')
+            .select('mercancia_id, cantidad, estado')
+            .eq('id', r.origen_id)
+            .single();
+          if (venta && venta.estado === 'completada') {
+            const { data: prod } = await supabase
+              .from('mercancia')
+              .select('stock')
+              .eq('id', venta.mercancia_id)
+              .single();
+            if (prod) {
+              await supabase.from('mercancia')
+                .update({ stock: prod.stock + venta.cantidad })
+                .eq('id', venta.mercancia_id);
+            }
+          }
+          await supabase.from('ventas').delete().eq('id', r.origen_id);
+          actionMsg = 'Venta eliminada y stock restaurado';
+        } else if (r.origen_tipo === 'factura') {
+          // Eliminar factura completa
+          await supabase.from('facturas').delete().eq('id', r.origen_id);
+          actionMsg = 'Factura eliminada';
+        } else if (r.origen_tipo === 'cobro') {
+          // Los cobros son recurrentes mensuales — revertir en vez de eliminar
           await supabase.from('cobros')
             .update({ estado: 'pendiente', fecha_pago: null, tipo_pago: null })
             .eq('id', r.origen_id);
-        } else if (r.origen_tipo === 'venta') {
-          await supabase.from('ventas')
-            .update({ estado: 'pendiente' })
-            .eq('id', r.origen_id);
-        } else if (r.origen_tipo === 'instalacion') {
-          await supabase.from('instalaciones')
-            .update({ estado_cobro: 'pendiente', metodo_pago: null, recibido_en: null })
-            .eq('id', r.origen_id);
-        } else if (r.origen_tipo === 'factura') {
-          await supabase.from('facturas')
-            .update({ estado: 'pendiente' })
-            .eq('id', r.origen_id);
+          actionMsg = 'Cobro revertido a pendiente';
         }
-        toast.success(`Registro eliminado — ${origenLabel[r.origen_tipo] ?? r.origen_tipo} revertido a pendiente`);
+
+        toast.success(`Registro eliminado — ${actionMsg}`);
       } else {
         toast.success('Registro eliminado');
       }
@@ -398,8 +420,8 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                         {deleteConfirm === r.id ? (
                           <div className="flex items-center gap-1">
                             {r.origen_tipo && (
-                              <span className="text-xs text-orange-400 mr-1">
-                                ⚠ Revierte {origenLabel[r.origen_tipo]}
+                              <span className="text-xs text-red-400 mr-1 font-semibold">
+                                ⚠ {r.origen_tipo === 'cobro' ? `Revierte ${origenLabel[r.origen_tipo]}` : `ELIMINA ${origenLabel[r.origen_tipo]}`}
                               </span>
                             )}
                             <button
@@ -420,7 +442,13 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                           <button
                             onClick={() => setDeleteConfirm(r.id)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                            title={r.origen_tipo ? `Eliminar y revertir ${origenLabel[r.origen_tipo]}` : 'Eliminar'}
+                            title={
+                              r.origen_tipo === 'cobro'
+                                ? `Eliminar y revertir Cobro`
+                                : r.origen_tipo
+                                  ? `Eliminar también ${origenLabel[r.origen_tipo]}`
+                                  : 'Eliminar'
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
