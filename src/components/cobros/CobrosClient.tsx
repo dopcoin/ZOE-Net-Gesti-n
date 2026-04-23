@@ -135,22 +135,23 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     anio: number,
     fechaPago: string | null
   ) {
-    try {
-      const fecha = fechaPago
-        ? new Date(fechaPago).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
-      await createRegistroDiario({
-        fecha,
-        tipo: 'ingreso',
-        categoria: 'Cobros clientes',
-        descripcion: `${cliente.nombre} ${cliente.apellido} — ${meses[mes - 1]} ${anio}`,
-        monto,
-        referencia: null,
-        registrado_por: null,
-      });
-    } catch {
-      // No bloquear el flujo de cobro si el libro diario falla
-      console.warn('[LibroDiario] Error al registrar entrada automática');
+    const fecha = fechaPago
+      ? new Date(fechaPago).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0];
+
+    const result = await createRegistroDiario({
+      fecha,
+      tipo: 'ingreso',
+      categoria: 'Cobros clientes',
+      descripcion: `${cliente.nombre} ${cliente.apellido} — ${meses[mes - 1]} ${anio}`,
+      monto,
+      referencia: null,
+      registrado_por: null,
+    });
+
+    if (result.error) {
+      console.error('[LibroDiario] Error:', result.error);
+      toast.warning(`Cobro registrado, pero falló el Libro Diario: ${result.error.message}`);
     }
   }
 
