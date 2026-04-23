@@ -297,34 +297,34 @@ export default function FinanzasClient({
   const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4', '#F97316', '#EC4899'];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 sm:space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-            <PiggyBank className="text-blue-400" size={28} />
+      <div className="flex flex-col gap-3">
+        <div className="hidden sm:block">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
+            <PiggyBank className="text-blue-400" size={26} />
             Análisis Financiero
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Estado de resultados · Flujo de caja · KPIs ejecutivos</p>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Estado de resultados · Flujo de caja · KPIs ejecutivos</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Periodo selector */}
-          <div className="flex rounded-lg bg-[#1C2333] border border-[#1F2937] p-1">
+          <div className="flex flex-1 sm:flex-initial rounded-lg bg-[#1C2333] border border-[#1F2937] p-1">
             {(['mes', 'trimestre', 'anio'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriodo(p)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors capitalize ${
+                className={`flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 text-xs font-semibold rounded-md transition-colors capitalize ${
                   periodo === p ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
-                {p === 'mes' ? 'Mes' : p === 'trimestre' ? 'Trimestre' : 'Año'}
+                {p === 'mes' ? 'Mes' : p === 'trimestre' ? 'Trim.' : 'Año'}
               </button>
             ))}
           </div>
-          <button onClick={exportPyG} className="btn-secondary flex items-center gap-2">
+          <button onClick={exportPyG} className="btn-secondary flex items-center justify-center gap-2">
             <Download size={14} />
-            CSV
+            <span className="hidden sm:inline">CSV</span>
           </button>
         </div>
       </div>
@@ -334,13 +334,16 @@ export default function FinanzasClient({
       </div>
 
       {/* ============ KPIs PRINCIPALES ============ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="kpi-card kpi-card-income">
           <div className="flex items-center justify-between">
             <span className="kpi-label">Ingresos</span>
             <TrendingUp size={16} className="text-emerald-400" />
           </div>
-          <div className="kpi-value text-emerald-400">{formatCurrency(financiero.ingresos)}</div>
+          <div className="kpi-value text-emerald-400 truncate">
+            <span className="sm:hidden">{formatShort(financiero.ingresos)}</span>
+            <span className="hidden sm:inline">{formatCurrency(financiero.ingresos)}</span>
+          </div>
           <div className="kpi-sub">{ingresosCategoria.length} categorías</div>
         </div>
 
@@ -349,7 +352,10 @@ export default function FinanzasClient({
             <span className="kpi-label">Egresos</span>
             <TrendingDown size={16} className="text-red-400" />
           </div>
-          <div className="kpi-value text-red-400">{formatCurrency(financiero.egresos)}</div>
+          <div className="kpi-value text-red-400 truncate">
+            <span className="sm:hidden">{formatShort(financiero.egresos)}</span>
+            <span className="hidden sm:inline">{formatCurrency(financiero.egresos)}</span>
+          </div>
           <div className="kpi-sub">{egresosCategoria.length} categorías</div>
         </div>
 
@@ -358,8 +364,9 @@ export default function FinanzasClient({
             <span className="kpi-label">Utilidad Neta</span>
             <Wallet size={16} className="text-blue-400" />
           </div>
-          <div className={`kpi-value ${financiero.utilidad >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-            {formatCurrency(financiero.utilidad)}
+          <div className={`kpi-value truncate ${financiero.utilidad >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+            <span className="sm:hidden">{formatShort(financiero.utilidad)}</span>
+            <span className="hidden sm:inline">{formatCurrency(financiero.utilidad)}</span>
           </div>
           <div className="kpi-sub">
             {financiero.utilidad >= 0 ? (
@@ -475,8 +482,8 @@ export default function FinanzasClient({
           {ingresosCategoria.length === 0 ? (
             <div className="h-[280px] flex items-center justify-center text-gray-600 text-sm">Sin ingresos en el período</div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-[240px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="h-[200px] sm:h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={ingresosCategoria} dataKey="value" innerRadius={50} outerRadius={85} paddingAngle={2}>
@@ -489,7 +496,7 @@ export default function FinanzasClient({
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-1.5 overflow-y-auto max-h-[240px]">
+              <div className="space-y-1.5 overflow-y-auto max-h-[160px] sm:max-h-[240px]">
                 {ingresosCategoria.map((c, i) => {
                   const pct = (c.value / financiero.ingresos) * 100;
                   return (
@@ -519,8 +526,8 @@ export default function FinanzasClient({
           {egresosCategoria.length === 0 ? (
             <div className="h-[280px] flex items-center justify-center text-gray-600 text-sm">Sin egresos en el período</div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-[240px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="h-[200px] sm:h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={egresosCategoria} dataKey="value" innerRadius={50} outerRadius={85} paddingAngle={2}>
@@ -533,7 +540,7 @@ export default function FinanzasClient({
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-1.5 overflow-y-auto max-h-[240px]">
+              <div className="space-y-1.5 overflow-y-auto max-h-[160px] sm:max-h-[240px]">
                 {egresosCategoria.map((c, i) => {
                   const pct = (c.value / financiero.egresos) * 100;
                   return (

@@ -88,8 +88,10 @@ export default function Sidebar() {
 
       <aside
         className={`fixed top-0 left-0 h-full bg-[#111827] border-r border-[#1F2937] z-50 transition-all duration-300 flex flex-col
-          ${sidebarCollapsed ? 'w-16' : 'w-64'}
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
+          w-[85vw] max-w-[320px] lg:w-64
+          ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}`}
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Logo + collapse */}
         <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
@@ -128,12 +130,12 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                className={`relative flex items-center gap-3 px-3 py-3 sm:py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]
                   ${active
-                    ? 'bg-blue-500/10 text-blue-400'
+                    ? 'bg-blue-500/10 text-blue-400 shadow-sm'
                     : 'text-gray-400 hover:bg-[#1C2333] hover:text-gray-200'
                   }
-                  ${sidebarCollapsed ? 'justify-center' : ''}`}
+                  ${sidebarCollapsed ? 'lg:justify-center' : ''}`}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <span className="relative flex-shrink-0">
@@ -144,7 +146,7 @@ export default function Sidebar() {
                     </span>
                   )}
                 </span>
-                {!sidebarCollapsed && <span>{item.label}</span>}
+                <span className={sidebarCollapsed ? 'lg:hidden' : ''}>{item.label}</span>
               </Link>
             );
           })}

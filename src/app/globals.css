@@ -5,9 +5,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-gray-100 font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
+    overscroll-behavior-y: none;
   }
 
   * {
@@ -18,16 +25,31 @@
   .tabular, .money, td[data-money], .stat-value {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Prevent iOS zoom on input focus (inputs need >= 16px on mobile) */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, textarea, select {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Larger tap targets on mobile */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
 }
 
 @layer components {
   /* ========== CARDS ========== */
   .card {
-    @apply bg-surface border border-[#1F2937] rounded-lg shadow-lg;
+    @apply bg-surface border border-[#1F2937] rounded-lg sm:rounded-xl shadow-lg;
   }
 
   .card-gradient {
-    @apply relative overflow-hidden rounded-lg border border-[#1F2937] shadow-lg;
+    @apply relative overflow-hidden rounded-lg sm:rounded-xl border border-[#1F2937] shadow-lg;
     background: linear-gradient(135deg, #111827 0%, #0F1725 100%);
   }
 
@@ -39,33 +61,43 @@
 
   /* ========== BUTTONS ========== */
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md hover:shadow-blue-500/10;
+    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md hover:shadow-blue-500/10 active:scale-[0.98];
+    min-height: 42px;
   }
 
   .btn-secondary {
-    @apply bg-[#1C2333] hover:bg-[#2A3142] text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-[#1F2937];
+    @apply bg-[#1C2333] hover:bg-[#2A3142] active:bg-[#252D3D] text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-[#1F2937] active:scale-[0.98];
+    min-height: 42px;
   }
 
   .btn-danger {
-    @apply bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+    @apply bg-red-600/20 hover:bg-red-600/30 active:bg-red-600/40 text-red-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors active:scale-[0.98];
+    min-height: 42px;
   }
 
   .btn-ghost {
     @apply text-gray-400 hover:text-white hover:bg-[#1C2333] px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
   }
 
+  /* Icon-only buttons — larger tap target on mobile */
+  .btn-icon {
+    @apply p-2 rounded-lg hover:bg-[#1C2333] text-gray-400 active:scale-95 transition-all;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
   /* ========== FORMS ========== */
   .input {
-    @apply w-full bg-[#1C2333] border border-[#1F2937] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors;
+    @apply w-full bg-[#1C2333] border border-[#1F2937] rounded-lg px-3 py-2.5 sm:py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors;
   }
 
   .label {
-    @apply block text-xs font-medium text-gray-400 mb-1;
+    @apply block text-xs font-medium text-gray-400 mb-1.5;
   }
 
   /* ========== BADGES ========== */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap;
   }
 
   .badge-success { @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/20; }
@@ -83,32 +115,87 @@
     @apply px-4 py-3 text-sm text-gray-300;
   }
 
+  /* Horizontal-scroll wrapper for tables */
+  .table-scroll {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  /* Visual fade hint that content scrolls horizontally */
+  .table-scroll-hint {
+    position: relative;
+  }
+  .table-scroll-hint::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 24px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(10, 15, 30, 0.8));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  @media (max-width: 768px) {
+    .table-scroll-hint::after { opacity: 1; }
+  }
+
+  /* ========== MOBILE LIST CARDS (alternativa a table en móvil) ========== */
+  .list-card {
+    @apply bg-[#1C2333]/50 border border-[#1F2937] rounded-lg p-3 flex flex-col gap-2 active:bg-[#1C2333] transition-colors;
+  }
+
+  .list-card-header {
+    @apply flex items-start justify-between gap-2;
+  }
+
+  .list-card-title {
+    @apply font-medium text-white text-sm truncate;
+  }
+
+  .list-card-meta {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400;
+  }
+
+  .list-card-field {
+    @apply flex items-center gap-1;
+  }
+
+  /* Show cards on mobile, table on desktop */
+  .show-mobile { @apply block md:hidden; }
+  .show-desktop { @apply hidden md:block; }
+
   /* ========== MODAL ========== */
+  /* On mobile: full-width bottom sheet; on desktop: centered modal */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4;
   }
 
   .modal-content {
-    @apply bg-surface border border-[#1F2937] rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto;
+    @apply bg-surface border-t border-x sm:border border-[#1F2937] rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto;
   }
 
-  /* ========== STAT CARDS ========== */
+  /* Drag handle for bottom sheet */
+  .modal-handle {
+    @apply sm:hidden w-10 h-1 rounded-full bg-gray-600 mx-auto mt-2 mb-1;
+  }
+
+  /* ========== STAT / KPI CARDS ========== */
   .stat-card {
-    @apply card p-4 flex flex-col gap-1;
+    @apply card p-3 sm:p-4 flex flex-col gap-1;
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-white font-mono;
+    @apply text-xl sm:text-2xl font-bold text-white font-mono;
     font-variant-numeric: tabular-nums;
   }
 
   .stat-label {
-    @apply text-xs text-gray-400 font-medium uppercase tracking-wider;
+    @apply text-[11px] sm:text-xs text-gray-400 font-medium uppercase tracking-wider;
   }
 
-  /* Financial KPI card — richer treatment */
   .kpi-card {
-    @apply relative p-5 rounded-xl border overflow-hidden;
+    @apply relative p-4 sm:p-5 rounded-xl border overflow-hidden;
     background: linear-gradient(135deg, #111827 0%, #0F1725 100%);
     border-color: #1F2937;
   }
@@ -125,11 +212,11 @@
   .kpi-card-neutral::after { background: linear-gradient(90deg, transparent, #6B7280, transparent); }
 
   .kpi-label {
-    @apply text-[11px] font-semibold uppercase tracking-widest text-gray-500;
+    @apply text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest text-gray-500;
   }
 
   .kpi-value {
-    @apply text-3xl font-bold tracking-tight mt-1 font-mono;
+    @apply text-2xl sm:text-3xl font-bold tracking-tight mt-1 font-mono;
     font-variant-numeric: tabular-nums;
   }
 
@@ -153,7 +240,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ========== AGING BUCKETS (cuentas por cobrar) ========== */
+  /* ========== AGING BUCKETS ========== */
   .aging-bucket {
     @apply flex items-center justify-between p-3 rounded-lg border transition-colors;
   }
@@ -163,7 +250,7 @@
   .aging-60      { @apply bg-orange-500/5 border-orange-500/20 text-orange-400; }
   .aging-90      { @apply bg-red-500/5 border-red-500/20 text-red-400; }
 
-  /* ========== MINI SPARKLINE / PROGRESS ========== */
+  /* ========== PROGRESS ========== */
   .progress-track {
     @apply w-full h-2 bg-[#1C2333] rounded-full overflow-hidden;
   }
@@ -172,7 +259,7 @@
     @apply h-full rounded-full transition-all duration-500;
   }
 
-  /* Section header */
+  /* ========== SECTION / DIVIDER ========== */
   .section-title {
     @apply text-sm font-semibold text-gray-300 uppercase tracking-wider;
   }
@@ -181,7 +268,6 @@
     @apply text-xs text-gray-500 mt-0.5;
   }
 
-  /* Divider with label */
   .divider-label {
     @apply flex items-center gap-3 text-xs font-semibold text-gray-500 uppercase tracking-widest;
   }
@@ -191,12 +277,24 @@
     content: '';
     @apply flex-1 h-px bg-[#1F2937];
   }
+
+  /* ========== FLOATING ACTION BUTTON (mobile CTA) ========== */
+  .fab {
+    @apply lg:hidden fixed bottom-20 right-4 z-30 w-14 h-14 rounded-full bg-blue-600 text-white shadow-2xl shadow-blue-500/30 flex items-center justify-center active:scale-95 transition-transform;
+  }
 }
 
 /* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+}
+
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 }
 
 ::-webkit-scrollbar-track {
@@ -218,10 +316,21 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes pulseGlow {
   0%, 100% { opacity: 0.6; }
   50%      { opacity: 1; }
 }
 
-.animate-fade-in  { animation: fadeIn 0.3s ease-out; }
+.animate-fade-in    { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up   { animation: slideUp 0.3s ease-out; }
 .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+
+/* Apply slide-up to modal content on mobile */
+@media (max-width: 640px) {
+  .modal-content { animation: slideUp 0.25s ease-out; }
+}

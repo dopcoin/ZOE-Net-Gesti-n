@@ -250,21 +250,22 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-500/10">
+      <div className="flex items-center justify-between gap-3">
+        <div className="hidden sm:flex items-center gap-3 min-w-0">
+          <div className="p-2 rounded-lg bg-blue-500/10 flex-shrink-0">
             <BookOpen className="h-5 w-5 text-blue-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-bold text-gray-100">Libro Diario</h1>
-            <p className="text-sm text-gray-500">Control de entradas y salidas</p>
+            <p className="text-xs sm:text-sm text-gray-500">Control de entradas y salidas</p>
           </div>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 ml-auto">
           <Plus className="h-4 w-4" />
-          Nuevo Registro
+          <span className="hidden xs:inline">Nuevo Registro</span>
+          <span className="inline xs:hidden">Nuevo</span>
         </button>
       </div>
 
@@ -305,16 +306,16 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
       </div>
 
       {/* Month navigator + filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="p-2 rounded-lg bg-[#1C2333] hover:bg-[#252D3D] text-gray-400 hover:text-gray-200 transition-colors">
-            <ChevronLeft className="h-4 w-4" />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <button onClick={prevMonth} className="btn-icon flex-shrink-0">
+            <ChevronLeft className="h-5 w-5" />
           </button>
-          <span className="text-base font-semibold text-gray-100 min-w-[140px] text-center">
+          <span className="text-base sm:text-lg font-semibold text-gray-100 text-center capitalize flex-1">
             {meses[currentMonth - 1]} {currentYear}
           </span>
-          <button onClick={nextMonth} className="p-2 rounded-lg bg-[#1C2333] hover:bg-[#252D3D] text-gray-400 hover:text-gray-200 transition-colors">
-            <ChevronRight className="h-4 w-4" />
+          <button onClick={nextMonth} className="btn-icon flex-shrink-0">
+            <ChevronRight className="h-5 w-5" />
           </button>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -322,7 +323,7 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
             <button
               key={t}
               onClick={() => setTipoFilter(t)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 tipoFilter === t
                   ? t === 'ingreso' ? 'bg-emerald-600 text-white'
                     : t === 'egreso' ? 'bg-red-600 text-white'
@@ -338,13 +339,112 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar..."
-            className="input text-sm h-8 px-3 w-40"
+            className="input text-sm flex-1 sm:flex-initial sm:w-40"
           />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden">
+      {/* Mobile: list cards */}
+      <div className="md:hidden space-y-2">
+        {filtered.length === 0 ? (
+          <div className="card p-8 text-center text-sm text-gray-500">
+            No hay registros para este mes
+          </div>
+        ) : (
+          filtered.map((r) => (
+            <div key={r.id} className="list-card">
+              <div className="list-card-header">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className={`badge ${r.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'} flex-shrink-0`}>
+                    {r.tipo === 'ingreso' ? '↑' : '↓'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="list-card-title">{r.descripcion}</div>
+                    <div className="text-[11px] text-gray-500 truncate">{r.categoria}</div>
+                  </div>
+                </div>
+                <div className={`font-bold font-mono tabular text-sm flex-shrink-0 ${
+                  r.tipo === 'ingreso' ? 'text-emerald-400' : 'text-red-400'
+                }`}>
+                  {r.tipo === 'egreso' ? '−' : '+'}{formatCurrency(r.monto)}
+                </div>
+              </div>
+              <div className="list-card-meta">
+                <span>{r.fecha ? formatDate(r.fecha) : '—'}</span>
+                {r.metodo_pago && (
+                  <span className="badge badge-info text-[10px]">{r.metodo_pago}</span>
+                )}
+                {r.recibido_en && <span className="text-gray-400">· {r.recibido_en}</span>}
+                {r.referencia && <span className="text-gray-500">Ref: {r.referencia}</span>}
+                {r.origen_tipo && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">
+                    🔗 {origenLabel[r.origen_tipo]}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-1 pt-1 border-t border-[#1F2937]/50">
+                <button
+                  onClick={() => openEdit(r)}
+                  className="btn-icon text-blue-400"
+                  aria-label="Editar"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                {deleteConfirm === r.id ? (
+                  <div className="flex items-center gap-1 flex-wrap justify-end">
+                    {r.origen_tipo && (
+                      <span className="text-[10px] text-red-400 font-semibold w-full text-right">
+                        ⚠ {r.origen_tipo === 'cobro' ? `Revierte ${origenLabel[r.origen_tipo]}` : `ELIMINA ${origenLabel[r.origen_tipo]}`}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleDelete(r)}
+                      disabled={loading}
+                      className="px-3 py-1.5 text-xs font-medium rounded bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Confirmar
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="px-3 py-1.5 text-xs font-medium rounded bg-[#1C2333] text-gray-400"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirm(r.id)}
+                    className="btn-icon text-red-400"
+                    aria-label="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+        {filtered.length > 0 && (
+          <div className="card p-3 flex items-center justify-between">
+            <span className="text-xs text-gray-400">
+              Total ({filtered.length} registros)
+            </span>
+            <span className={`font-bold font-mono tabular ${
+              (filtered.filter(r => r.tipo === 'ingreso').reduce((s, r) => s + r.monto, 0) -
+               filtered.filter(r => r.tipo === 'egreso').reduce((s, r) => s + r.monto, 0)) >= 0
+                ? 'text-emerald-400' : 'text-red-400'
+            }`}>
+              {formatCurrency(
+                filtered.filter(r => r.tipo === 'ingreso').reduce((s, r) => s + r.monto, 0) -
+                filtered.filter(r => r.tipo === 'egreso').reduce((s, r) => s + r.monto, 0)
+              )}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

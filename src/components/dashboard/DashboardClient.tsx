@@ -95,21 +95,25 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 sm:space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5 capitalize">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="hidden sm:block">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5 capitalize">
             {new Date().toLocaleDateString('es-DO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
+        <p className="sm:hidden text-xs text-gray-500 capitalize">
+          {new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
         <div className="flex items-center gap-2">
-          <Link href="/finanzas" className="btn-secondary flex items-center gap-2">
+          <Link href="/finanzas" className="btn-secondary flex-1 sm:flex-initial flex items-center justify-center gap-2">
             <BarChart3 size={16} />
-            Análisis Financiero
+            <span className="hidden xs:inline sm:inline">Análisis</span>
+            <span className="inline xs:hidden sm:hidden">Finanzas</span>
           </Link>
-          <Link href="/libro-diario" className="btn-primary flex items-center gap-2">
+          <Link href="/libro-diario" className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-2">
             <BookOpen size={16} />
             Libro Diario
           </Link>
@@ -123,7 +127,7 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
           <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Salud Financiera</span>
           <div className="h-px flex-1 bg-[#1F2937]" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Ingresos */}
           <div className="kpi-card kpi-card-income">
             <div className="flex items-center justify-between">
@@ -132,7 +136,10 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
                 <TrendingUp size={16} className="text-emerald-400" />
               </div>
             </div>
-            <div className="kpi-value text-emerald-400">{formatCurrency(stats.ingresosMes)}</div>
+            <div className="kpi-value text-emerald-400 truncate" title={formatCurrency(stats.ingresosMes)}>
+              <span className="sm:hidden">{formatShort(stats.ingresosMes)}</span>
+              <span className="hidden sm:inline">{formatCurrency(stats.ingresosMes)}</span>
+            </div>
             <div className="kpi-sub flex items-center gap-2">
               <span>Cobros: {formatCurrency(stats.totalRecaudadoMes)}</span>
               <Delta current={stats.totalRecaudadoMes} previous={stats.totalRecaudadoPrev} />
@@ -147,7 +154,10 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
                 <TrendingDown size={16} className="text-red-400" />
               </div>
             </div>
-            <div className="kpi-value text-red-400">{formatCurrency(stats.egresosMes)}</div>
+            <div className="kpi-value text-red-400 truncate" title={formatCurrency(stats.egresosMes)}>
+              <span className="sm:hidden">{formatShort(stats.egresosMes)}</span>
+              <span className="hidden sm:inline">{formatCurrency(stats.egresosMes)}</span>
+            </div>
             <div className="kpi-sub">
               {stats.ingresosMes > 0
                 ? `${((stats.egresosMes / stats.ingresosMes) * 100).toFixed(0)}% de ingresos`
@@ -163,8 +173,9 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
                 <Wallet size={16} className="text-blue-400" />
               </div>
             </div>
-            <div className={`kpi-value ${stats.utilidadMes >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-              {formatCurrency(stats.utilidadMes)}
+            <div className={`kpi-value truncate ${stats.utilidadMes >= 0 ? 'text-blue-400' : 'text-red-400'}`} title={formatCurrency(stats.utilidadMes)}>
+              <span className="sm:hidden">{formatShort(stats.utilidadMes)}</span>
+              <span className="hidden sm:inline">{formatCurrency(stats.utilidadMes)}</span>
             </div>
             <div className="kpi-sub">
               {stats.utilidadMes >= 0 ? 'Balance positivo' : 'Balance negativo'} este mes
@@ -281,7 +292,7 @@ export default function DashboardClient({ stats, actividad: initialActividad }: 
           <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Operaciones</span>
           <div className="h-px flex-1 bg-[#1F2937]" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
           <Link href="/clientes" className="kpi-card kpi-card-neutral hover:border-blue-500/40 transition-colors group">
             <div className="flex items-center justify-between">
               <span className="kpi-label">Clientes</span>
