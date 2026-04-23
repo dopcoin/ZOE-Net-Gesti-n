@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { createRegistroDiario } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
@@ -148,19 +147,15 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     tipoPago?: TipoCobro | null,
     recibidoPor?: string | null
   ) {
-    // Normalizar la fecha a formato YYYY-MM-DD
     const fecha = fechaPago
-      ? fechaPago.includes('T')
-        ? fechaPago.split('T')[0]
-        : fechaPago
+      ? fechaPago.includes('T') ? fechaPago.split('T')[0] : fechaPago
       : new Date().toISOString().split('T')[0];
 
-    // Capitalizar método de pago para el libro diario
     const metodo_pago = tipoPago
       ? tipoPago.charAt(0).toUpperCase() + tipoPago.slice(1)
       : null;
 
-    const result = await createRegistroDiario({
+    const payload: Record<string, unknown> = {
       fecha,
       tipo: 'ingreso',
       categoria: 'Cobros clientes',
@@ -169,12 +164,22 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       referencia: null,
       metodo_pago,
       recibido_en: recibidoPor ?? null,
-      registrado_por: profile?.id ?? null,
-    });
+    };
+    // Solo incluir registrado_por si tenemos el ID del usuario
+    if (profile?.id) payload.registrado_por = profile.id;
 
-    if (result.error) {
-      console.error('[LibroDiario] Error:', result.error);
-      toast.warning(`Cobro registrado. Error en Libro Diario: ${result.error.message}`);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('libro_diario')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[LibroDiario] Error al insertar:', JSON.stringify(error));
+      toast.error(`⚠ Libro Diario: ${error.message} [${error.code ?? 'sin código'}]`);
+    } else {
+      console.log('[LibroDiario] Entrada creada:', data?.id);
     }
   }
 
