@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'recovery'>('login');
   const [recoverySent, setRecoverySent] = useState(false);
   const [recoveryLink, setRecoveryLink] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
   const [inactiveMsg, setInactiveMsg] = useState(false);
 
   useEffect(() => {
@@ -61,8 +62,13 @@ export default function LoginPage() {
         toast.error(result.error || 'Error al enviar email');
       } else {
         setRecoverySent(true);
+        setEmailSent(result.sent === true);
         setRecoveryLink(result.recoveryLink || '');
-        toast.success('Enlace de recuperación generado');
+        if (result.sent) {
+          toast.success('Email de recuperación enviado');
+        } else {
+          toast.success('Enlace generado');
+        }
       }
     } catch {
       toast.error('Error al enviar email de recuperación');
@@ -153,17 +159,30 @@ export default function LoginPage() {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mx-auto">
                     <Mail className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h2 className="text-lg font-semibold text-white">Recuperar Contraseña</h2>
-                  {recoveryLink ? (
+                  {emailSent ? (
                     <>
+                      <h2 className="text-lg font-semibold text-white">Email Enviado</h2>
                       <p className="text-sm text-gray-400">
-                        Haz clic en el botón para restablecer la contraseña de <span className="text-white font-medium">{email}</span>:
+                        Enviamos un enlace de recuperación a{' '}
+                        <span className="text-white font-medium">{email}</span>.
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Revisa tu bandeja de entrada y la carpeta de spam.<br />
+                        El enlace expira en 24 horas.
+                      </p>
+                    </>
+                  ) : recoveryLink ? (
+                    <>
+                      <h2 className="text-lg font-semibold text-white">Restablecer Contraseña</h2>
+                      <p className="text-sm text-gray-400">
+                        Haz clic en el botón para cambiar la contraseña de{' '}
+                        <span className="text-white font-medium">{email}</span>:
                       </p>
                       <a
                         href={recoveryLink}
                         className="block w-full text-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                       >
-                        Restablecer Contraseña
+                        Cambiar Contraseña
                       </a>
                       <p className="text-xs text-gray-500">
                         Este enlace expira en 24 horas.
@@ -171,8 +190,11 @@ export default function LoginPage() {
                     </>
                   ) : (
                     <>
+                      <h2 className="text-lg font-semibold text-white">Solicitud Enviada</h2>
                       <p className="text-sm text-gray-400">
-                        No se encontró una cuenta con <span className="text-white font-medium">{email}</span>.
+                        Si existe una cuenta con{' '}
+                        <span className="text-white font-medium">{email}</span>,
+                        recibirás instrucciones por email.
                       </p>
                     </>
                   )}
