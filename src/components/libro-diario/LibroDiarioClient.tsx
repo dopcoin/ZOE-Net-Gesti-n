@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { createClient } from '@/lib/supabase/client';
 import { createRegistroDiario, updateRegistroDiario, deleteRegistroDiario } from '@/lib/services';
 import { formatCurrency, formatDate, meses } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -15,6 +16,13 @@ import {
 const DEFAULT_CATEGORIAS_ENTRADA = ['Cobros clientes', 'Servicios adicionales', 'Instalaciones', 'Otros ingresos'];
 const DEFAULT_CATEGORIAS_SALIDA = ['Infraestructura', 'Salarios', 'Equipos', 'Servicios externos', 'Mantenimiento', 'Otros gastos'];
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
+
+const origenLabel: Record<string, string> = {
+  cobro: 'Cobro',
+  venta: 'Venta',
+  instalacion: 'Instalación',
+  factura: 'Factura',
+};
 
 const emptyForm = {
   fecha: new Date().toISOString().split('T')[0],
@@ -181,12 +189,37 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(r: LibroDiario) {
     setLoading(true);
     try {
-      const result = await deleteRegistroDiario(id);
+      const result = await deleteRegistroDiario(r.id);
       if (result.error) { toast.error('Error al eliminar'); return; }
-      toast.success('Registro eliminado');
+
+      // Si tiene origen vinculado → revertir estado de pago en el origen
+      if (r.origen_id && r.origen_tipo) {
+        const supabase = createClient();
+        if (r.origen_tipo === 'cobro') {
+          await supabase.from('cobros')
+            .update({ estado: 'pendiente', fecha_pago: null, tipo_pago: null })
+            .eq('id', r.origen_id);
+        } else if (r.origen_tipo === 'venta') {
+          await supabase.from('ventas')
+            .update({ estado: 'pendiente' })
+            .eq('id', r.origen_id);
+        } else if (r.origen_tipo === 'instalacion') {
+          await supabase.from('instalaciones')
+            .update({ estado_cobro: 'pendiente', metodo_pago: null, recibido_en: null })
+            .eq('id', r.origen_id);
+        } else if (r.origen_tipo === 'factura') {
+          await supabase.from('facturas')
+            .update({ estado: 'pendiente' })
+            .eq('id', r.origen_id);
+        }
+        toast.success(`Registro eliminado — ${origenLabel[r.origen_tipo] ?? r.origen_tipo} revertido a pendiente`);
+      } else {
+        toast.success('Registro eliminado');
+      }
+
       setDeleteConfirm(null);
       router.refresh();
     } finally {
@@ -329,6 +362,11 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                       {r.referencia && (
                         <div className="text-xs text-gray-500 mt-0.5">Ref: {r.referencia}</div>
                       )}
+                      {r.origen_tipo && (
+                        <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-500/15 text-orange-400 border border-orange-500/20">
+                          🔗 {origenLabel[r.origen_tipo] ?? r.origen_tipo}
+                        </span>
+                      )}
                     </td>
                     <td className="table-cell">
                       {r.metodo_pago && (
@@ -359,8 +397,13 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                         </button>
                         {deleteConfirm === r.id ? (
                           <div className="flex items-center gap-1">
+                            {r.origen_tipo && (
+                              <span className="text-xs text-orange-400 mr-1">
+                                ⚠ Revierte {origenLabel[r.origen_tipo]}
+                              </span>
+                            )}
                             <button
-                              onClick={() => handleDelete(r.id)}
+                              onClick={() => handleDelete(r)}
                               disabled={loading}
                               className="px-2 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white transition-colors"
                             >
@@ -377,7 +420,7 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                           <button
                             onClick={() => setDeleteConfirm(r.id)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Eliminar"
+                            title={r.origen_tipo ? `Eliminar y revertir ${origenLabel[r.origen_tipo]}` : 'Eliminar'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

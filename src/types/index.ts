@@ -195,6 +195,8 @@ export interface LibroDiario {
   metodo_pago: string | null;
   recibido_en: string | null;
   registrado_por: string | null;
+  origen_id: string | null;
+  origen_tipo: string | null;
   created_at: string;
   profiles?: { nombre: string; apellido: string } | null;
 }
