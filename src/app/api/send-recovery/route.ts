@@ -17,23 +17,31 @@ export async function POST(req: NextRequest) {
     );
 
     const origin = req.headers.get('origin') || req.nextUrl.origin;
-    // Redirect to auth callback which exchanges the code, then goes to reset-password
-    const redirectTo = `${origin}/auth/callback?next=/reset-password`;
 
-    console.log('[send-recovery] Sending recovery email to:', email, 'redirectTo:', redirectTo);
-
-    // Use resetPasswordForEmail — this sends the email via Supabase's configured SMTP
-    const { error } = await adminSupabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
+    // Use generateLink (admin API) — generates a magic link without relying on SMTP
+    const { data, error } = await adminSupabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${origin}/auth/callback?next=/reset-password`,
+      },
     });
 
     if (error) {
-      console.error('[send-recovery] Error:', error.message, error);
+      console.error('[send-recovery] generateLink error:', error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    console.log('[send-recovery] Email sent successfully to:', email);
-    return NextResponse.json({ success: true });
+    if (!data?.properties?.action_link) {
+      return NextResponse.json({ error: 'No se pudo generar el enlace' }, { status: 500 });
+    }
+
+    // Return the recovery link directly — the frontend will show it
+    return NextResponse.json({
+      success: true,
+      // The action_link is the full recovery URL from Supabase
+      recoveryLink: data.properties.action_link,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[send-recovery] Catch error:', message);

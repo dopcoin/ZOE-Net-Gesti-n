@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'recovery'>('login');
   const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryLink, setRecoveryLink] = useState('');
   const [inactiveMsg, setInactiveMsg] = useState(false);
 
   useEffect(() => {
@@ -55,12 +56,13 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+      const result = await response.json();
       if (!response.ok) {
-        const result = await response.json();
         toast.error(result.error || 'Error al enviar email');
       } else {
         setRecoverySent(true);
-        toast.success('Si el email existe, recibirás un enlace de recuperación');
+        setRecoveryLink(result.recoveryLink || '');
+        toast.success('Enlace de recuperación generado');
       }
     } catch {
       toast.error('Error al enviar email de recuperación');
@@ -151,14 +153,32 @@ export default function LoginPage() {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mx-auto">
                     <Mail className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h2 className="text-lg font-semibold text-white">Email Enviado</h2>
-                  <p className="text-sm text-gray-400">
-                    Revisa tu bandeja de entrada en <span className="text-white font-medium">{email}</span>.
-                    Haz clic en el enlace del email para restablecer tu contraseña.
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Si no lo ves, revisa la carpeta de spam.
-                  </p>
+                  <h2 className="text-lg font-semibold text-white">Enlace Generado</h2>
+                  {recoveryLink ? (
+                    <>
+                      <p className="text-sm text-gray-400">
+                        Haz clic en el siguiente enlace para restablecer tu contraseña:
+                      </p>
+                      <a
+                        href={recoveryLink}
+                        className="block w-full text-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Restablecer Contraseña
+                      </a>
+                      <p className="text-xs text-gray-500">
+                        Este enlace expira en 24 horas.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-400">
+                        Revisa tu bandeja de entrada en <span className="text-white font-medium">{email}</span>.
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Si no lo ves, revisa la carpeta de spam.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <form onSubmit={handleRecovery} className="space-y-4">
