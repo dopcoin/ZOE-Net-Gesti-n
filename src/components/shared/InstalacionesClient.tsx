@@ -165,22 +165,23 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
     setShowModal(true);
   }
 
-  // Auto-crear entrada en Libro Diario cuando el cobro de instalación es pagado
-  async function registrarEnLibroDiario(inst: Instalacion, monto: number, clienteNombre: string) {
-    const now = new Date();
-    const fecha = now.toISOString().split('T')[0];
-    const mes = now.getMonth() + 1;
-    const anio = now.getFullYear();
+  async function eliminarDeLibroDiario(instalacionId: string) {
+    const supabase = createClient();
+    await supabase.from('libro_diario').delete().eq('origen_id', instalacionId).eq('origen_tipo', 'instalacion');
+  }
 
+  async function registrarEnLibroDiario(instalacionId: string, tipo: string, monto: number, clienteNombre: string) {
     const payload: Record<string, unknown> = {
-      fecha,
+      fecha: new Date().toISOString().split('T')[0],
       tipo: 'ingreso',
       categoria: 'Instalaciones',
-      descripcion: `Instalación — ${clienteNombre} (${inst.tipo})`,
+      descripcion: `Instalación — ${clienteNombre} (${tipo})`,
       monto,
       referencia: null,
       metodo_pago: form.metodo_pago || null,
       recibido_en: form.recibido_en || null,
+      origen_id: instalacionId,
+      origen_tipo: 'instalacion',
     };
     if (profile?.id) payload.registrado_por = profile.id;
 
@@ -222,12 +223,15 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         return;
       }
       toast.success('Instalación actualizada');
-      // Registrar en libro diario si transicionó a pagado
       const eraYaPagado = editing.estado_cobro === 'pagado';
       if (form.estado_cobro === 'pagado' && !eraYaPagado && form.costo > 0) {
-        const clienteNombre = clientes.find((c) => c.id === form.cliente_id);
-        const nombre = clienteNombre ? `${clienteNombre.nombre} ${clienteNombre.apellido}` : 'Cliente';
-        await registrarEnLibroDiario(editing, form.costo, nombre);
+        // Transición a pagado → crear entrada
+        const clienteObj = clientes.find((c) => c.id === form.cliente_id);
+        const nombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
+        await registrarEnLibroDiario(editing.id, form.tipo, form.costo, nombre);
+      } else if (form.estado_cobro !== 'pagado' && eraYaPagado) {
+        // Revertido → eliminar entrada
+        await eliminarDeLibroDiario(editing.id);
       }
     } else {
       const result = await createInstalacion(payload);
@@ -237,11 +241,10 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         return;
       }
       toast.success('Instalación creada');
-      // Registrar en libro diario si se crea directamente como pagado
-      if (form.estado_cobro === 'pagado' && form.costo > 0) {
-        const clienteNombre = clientes.find((c) => c.id === form.cliente_id);
-        const nombre = clienteNombre ? `${clienteNombre.nombre} ${clienteNombre.apellido}` : 'Cliente';
-        await registrarEnLibroDiario({ id: '', cliente_id: form.cliente_id, tipo: form.tipo, direccion: form.direccion, prioridad: form.prioridad, estado: form.estado, fecha_programada: null, notas: null, tecnico_asignado: null, created_at: '' }, form.costo, nombre);
+      if (form.estado_cobro === 'pagado' && form.costo > 0 && result.data?.id) {
+        const clienteObj = clientes.find((c) => c.id === form.cliente_id);
+        const nombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
+        await registrarEnLibroDiario(result.data.id, form.tipo, form.costo, nombre);
       }
     }
     setShowModal(false);
@@ -256,6 +259,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       toast.error(getErrorMessage(result.error));
       return;
     }
+    await eliminarDeLibroDiario(id);
     toast.success('Instalación eliminada');
     setInstalaciones((prev) => prev.filter((i) => i.id !== id));
     router.refresh();

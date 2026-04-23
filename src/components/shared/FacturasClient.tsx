@@ -181,7 +181,12 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
   };
 
   // ---------- Libro Diario ----------
-  const registrarEnLibroDiario = async (numero: string, clienteNombre: string | null, total: number) => {
+  const eliminarDeLibroDiario = async (facturaId: string) => {
+    const supabase = createClient();
+    await supabase.from('libro_diario').delete().eq('origen_id', facturaId).eq('origen_tipo', 'factura');
+  };
+
+  const registrarEnLibroDiario = async (numero: string, clienteNombre: string | null, total: number, facturaId: string) => {
     const supabase = createClient();
     const payload: Record<string, unknown> = {
       fecha: new Date().toISOString().split('T')[0],
@@ -190,6 +195,8 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       descripcion: `Factura ${numero}${clienteNombre ? ` — ${clienteNombre}` : ''}`,
       monto: total,
       referencia: numero,
+      origen_id: facturaId,
+      origen_tipo: 'factura',
     };
     if (profile?.id) payload.registrado_por = profile.id;
     const { error } = await supabase.from('libro_diario').insert(payload);
@@ -240,11 +247,10 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
           return;
         }
         toast.success('Factura creada exitosamente');
-        // Registrar en libro diario si se crea como pagada
-        if (formData.estado === 'pagada' && total > 0) {
+        if (formData.estado === 'pagada' && total > 0 && result.data?.id) {
           const cliente = clientes.find((c) => c.id === formData.cliente_id);
           const nombre = cliente ? `${cliente.nombre} ${cliente.apellido}` : null;
-          await registrarEnLibroDiario(formData.numero, nombre, total);
+          await registrarEnLibroDiario(formData.numero, nombre, total, result.data.id);
         }
       } else if (selectedFactura) {
         const result = await updateFactura(selectedFactura.id, payload);
@@ -253,12 +259,13 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
           return;
         }
         toast.success('Factura actualizada exitosamente');
-        // Registrar en libro diario si transicionó a pagada
         const eraYaPagada = selectedFactura.estado === 'pagada';
         if (formData.estado === 'pagada' && !eraYaPagada && total > 0) {
           const cliente = clientes.find((c) => c.id === formData.cliente_id);
           const nombre = cliente ? `${cliente.nombre} ${cliente.apellido}` : null;
-          await registrarEnLibroDiario(formData.numero, nombre, total);
+          await registrarEnLibroDiario(formData.numero, nombre, total, selectedFactura.id);
+        } else if (formData.estado !== 'pagada' && eraYaPagada) {
+          await eliminarDeLibroDiario(selectedFactura.id);
         }
       }
 
@@ -280,6 +287,7 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       toast.error(getErrorMessage(result.error));
       return;
     }
+    await eliminarDeLibroDiario(factura.id);
     toast.success('Factura eliminada');
     router.refresh();
   };
@@ -295,12 +303,11 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       prev.map((f) => (f.id === factura.id ? { ...f, estado } : f))
     );
     toast.success(`Estado cambiado a ${estado}`);
-    // Registrar en libro diario si cambia A pagada desde otro estado
     if (estado === 'pagada' && factura.estado !== 'pagada' && (factura.total ?? 0) > 0) {
-      const nombre = factura.clientes
-        ? `${factura.clientes.nombre} ${factura.clientes.apellido}`
-        : null;
-      await registrarEnLibroDiario(factura.numero, nombre, factura.total ?? 0);
+      const nombre = factura.clientes ? `${factura.clientes.nombre} ${factura.clientes.apellido}` : null;
+      await registrarEnLibroDiario(factura.numero, nombre, factura.total ?? 0, factura.id);
+    } else if (estado !== 'pagada' && factura.estado === 'pagada') {
+      await eliminarDeLibroDiario(factura.id);
     }
     router.refresh();
   };

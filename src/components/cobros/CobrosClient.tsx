@@ -138,12 +138,19 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
   }
 
   // Registra un cobro pagado automáticamente en el Libro Diario
+  async function eliminarDeLibroDiario(origenId: string, origenTipo: string) {
+    const supabase = createClient();
+    await supabase.from('libro_diario').delete()
+      .eq('origen_id', origenId).eq('origen_tipo', origenTipo);
+  }
+
   async function registrarEnLibroDiario(
     cliente: Cliente,
     monto: number,
     mes: number,
     anio: number,
     fechaPago: string | null,
+    cobroId: string | null,
     tipoPago?: TipoCobro | null,
     recibidoPor?: string | null
   ) {
@@ -164,17 +171,13 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       referencia: null,
       metodo_pago,
       recibido_en: recibidoPor ?? null,
+      origen_id: cobroId,
+      origen_tipo: 'cobro',
     };
-    // Solo incluir registrado_por si tenemos el ID del usuario
     if (profile?.id) payload.registrado_por = profile.id;
 
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from('libro_diario')
-      .insert(payload)
-      .select()
-      .single();
-
+    const { data, error } = await supabase.from('libro_diario').insert(payload).select('id').single();
     if (error) {
       console.error('[LibroDiario] Error al insertar:', JSON.stringify(error));
       toast.error(`⚠ Libro Diario: ${error.message} [${error.code ?? 'sin código'}]`);
@@ -192,7 +195,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     fechaPago?: string | null,
     existingCobroId?: string | null,
     recibidoPor?: string | null
-  ) {
+  ): Promise<string | null> {
     const supabase = createClient();
     const payload: Record<string, unknown> = {
       cliente_id: clienteId,
@@ -209,9 +212,11 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     if (existingCobroId) {
       const { error } = await supabase.from('cobros').update(payload).eq('id', existingCobroId);
       if (error) throw error;
+      return existingCobroId;
     } else {
-      const { error } = await supabase.from('cobros').insert(payload);
+      const { data, error } = await supabase.from('cobros').insert(payload).select('id').single();
       if (error) throw error;
+      return data?.id ?? null;
     }
   }
 
@@ -220,19 +225,14 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     setLoading(key);
     const fechaPago = new Date().toISOString();
     try {
-      await upsertCobro(
-        cc.cliente.id,
-        'pagado',
-        cc.cliente.monto_mensual,
-        'efectivo',
-        null,
-        fechaPago,
-        cc.cobro?.id
+      const cobroId = await upsertCobro(
+        cc.cliente.id, 'pagado', cc.cliente.monto_mensual, 'efectivo',
+        null, fechaPago, cc.cobro?.id
       );
       // Solo registrar en libro diario si no había cobro pagado antes
       const yaEstabaPagado = cc.cobro?.estado === 'pagado' || cc.cobro?.estado === 'parcial';
       if (!yaEstabaPagado) {
-        await registrarEnLibroDiario(cc.cliente, cc.cliente.monto_mensual, currentMonth, currentYear, fechaPago, 'efectivo');
+        await registrarEnLibroDiario(cc.cliente, cc.cliente.monto_mensual, currentMonth, currentYear, fechaPago, cobroId, 'efectivo');
       }
       toast.success(`Cobro registrado para ${cc.cliente.nombre} ${cc.cliente.apellido}`);
       router.refresh();
@@ -329,25 +329,24 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
         ? (formFechaPago ? new Date(formFechaPago).toISOString() : new Date().toISOString())
         : null;
 
-      await upsertCobro(
-        modalData.cliente.id,
-        formEstado,
-        monto,
-        esPago ? formTipoPago : null,
-        formNotas || null,
-        fechaPagoISO,
-        modalData.cobro?.id,
-        esPago ? (formRecibidoPor || null) : null
+      const cobroId = await upsertCobro(
+        modalData.cliente.id, formEstado, monto,
+        esPago ? formTipoPago : null, formNotas || null, fechaPagoISO,
+        modalData.cobro?.id, esPago ? (formRecibidoPor || null) : null
       );
 
-      // Registrar en libro diario solo si es una transición nueva a pagado/parcial
       const estadoAnterior = modalData.cobro?.estado;
       const eraYaPago = estadoAnterior === 'pagado' || estadoAnterior === 'parcial';
+
       if (esPago && !eraYaPago) {
+        // Transición a pagado → crear entrada
         await registrarEnLibroDiario(
           modalData.cliente, monto, currentMonth, currentYear,
-          fechaPagoISO, formTipoPago, formRecibidoPor || null
+          fechaPagoISO, cobroId, formTipoPago, formRecibidoPor || null
         );
+      } else if (!esPago && eraYaPago && modalData.cobro?.id) {
+        // Revertido a no-pagado → eliminar entrada
+        await eliminarDeLibroDiario(modalData.cobro.id, 'cobro');
       }
 
       toast.success(`Cobro actualizado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);
@@ -368,9 +367,12 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     if (!window.confirm('¿Eliminar este registro de cobro? El cliente quedará en estado pendiente.')) return;
     setSavingModal(true);
     try {
+      const cobroId = modalData.cobro.id;
       const supabase = createClient();
-      const { error } = await supabase.from('cobros').delete().eq('id', modalData.cobro.id);
+      const { error } = await supabase.from('cobros').delete().eq('id', cobroId);
       if (error) throw error;
+      // Eliminar entrada vinculada del libro diario
+      await eliminarDeLibroDiario(cobroId, 'cobro');
       toast.success('Cobro eliminado');
       closeModal();
       router.refresh();

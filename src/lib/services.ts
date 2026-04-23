@@ -139,12 +139,12 @@ export async function deleteMercancia(id: string): Promise<ServiceResult> {
 }
 
 // ==================== VENTAS ====================
-export async function createVenta(data: Record<string, unknown>): Promise<ServiceResult> {
+export async function createVenta(data: Record<string, unknown>): Promise<ServiceResult<{ id: string }>> {
   try {
     const supabase = createClient();
-    const { error } = await supabase.from('ventas').insert(data);
+    const { data: result, error } = await supabase.from('ventas').insert(data).select('id').single();
     if (error) return { error: handleError(error) };
-    return {};
+    return { data: result };
   } catch (e) { return { error: handleError(e) }; }
 }
 
@@ -167,12 +167,12 @@ export async function deleteVenta(id: string): Promise<ServiceResult> {
 }
 
 // ==================== INSTALACIONES ====================
-export async function createInstalacion(data: Record<string, unknown>): Promise<ServiceResult> {
+export async function createInstalacion(data: Record<string, unknown>): Promise<ServiceResult<{ id: string }>> {
   try {
     const supabase = createClient();
-    const { error } = await supabase.from('instalaciones').insert(data);
+    const { data: result, error } = await supabase.from('instalaciones').insert(data).select('id').single();
     if (error) return { error: handleError(error) };
-    return {};
+    return { data: result };
   } catch (e) { return { error: handleError(e) }; }
 }
 
@@ -195,12 +195,12 @@ export async function deleteInstalacion(id: string): Promise<ServiceResult> {
 }
 
 // ==================== FACTURAS ====================
-export async function createFactura(data: Record<string, unknown>): Promise<ServiceResult> {
+export async function createFactura(data: Record<string, unknown>): Promise<ServiceResult<{ id: string }>> {
   try {
     const supabase = createClient();
-    const { error } = await supabase.from('facturas').insert(data);
+    const { data: result, error } = await supabase.from('facturas').insert(data).select('id').single();
     if (error) return { error: handleError(error) };
-    return {};
+    return { data: result };
   } catch (e) { return { error: handleError(e) }; }
 }
 
@@ -223,6 +223,19 @@ export async function deleteFactura(id: string): Promise<ServiceResult> {
 }
 
 // ==================== LIBRO DIARIO ====================
+export async function deleteLibroDiarioByOrigen(origenId: string, origenTipo: string): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('libro_diario')
+      .delete()
+      .eq('origen_id', origenId)
+      .eq('origen_tipo', origenTipo);
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
 export async function createRegistroDiario(data: Record<string, unknown>): Promise<ServiceResult> {
   try {
     const supabase = createClient();
