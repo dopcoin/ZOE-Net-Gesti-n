@@ -41,15 +41,17 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const response = await fetch('/api/send-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
-      if (error) {
-        toast.error(error.message);
+      if (!response.ok) {
+        const result = await response.json();
+        toast.error(result.error || 'Error al enviar email');
       } else {
         setRecoverySent(true);
-        toast.success('Email de recuperación enviado');
+        toast.success('Si el email existe, recibirás un enlace de recuperación');
       }
     } catch {
       toast.error('Error al enviar email de recuperación');
