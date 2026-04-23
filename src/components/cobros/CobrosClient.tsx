@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createRegistroDiario } from '@/lib/services';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2 } from 'lucide-react';
@@ -126,6 +127,33 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     }
   }
 
+  // Registra un cobro pagado automáticamente en el Libro Diario
+  async function registrarEnLibroDiario(
+    cliente: Cliente,
+    monto: number,
+    mes: number,
+    anio: number,
+    fechaPago: string | null
+  ) {
+    try {
+      const fecha = fechaPago
+        ? new Date(fechaPago).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      await createRegistroDiario({
+        fecha,
+        tipo: 'ingreso',
+        categoria: 'Cobros clientes',
+        descripcion: `${cliente.nombre} ${cliente.apellido} — ${meses[mes - 1]} ${anio}`,
+        monto,
+        referencia: null,
+        registrado_por: null,
+      });
+    } catch {
+      // No bloquear el flujo de cobro si el libro diario falla
+      console.warn('[LibroDiario] Error al registrar entrada automática');
+    }
+  }
+
   async function upsertCobro(
     clienteId: string,
     estado: EstadoCobro,
@@ -159,6 +187,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   async function handleQuickPay(cc: ClienteCobro) {
     const key = `pay-${cc.cliente.id}`;
     setLoading(key);
+    const fechaPago = new Date().toISOString();
     try {
       await upsertCobro(
         cc.cliente.id,
@@ -166,9 +195,14 @@ export default function CobrosClient({ clientes, cobros }: Props) {
         cc.cliente.monto_mensual,
         'efectivo',
         null,
-        new Date().toISOString(),
+        fechaPago,
         cc.cobro?.id
       );
+      // Solo registrar en libro diario si no había cobro pagado antes
+      const yaEstabaPagado = cc.cobro?.estado === 'pagado' || cc.cobro?.estado === 'parcial';
+      if (!yaEstabaPagado) {
+        await registrarEnLibroDiario(cc.cliente, cc.cliente.monto_mensual, currentMonth, currentYear, fechaPago);
+      }
       toast.success(`Cobro registrado para ${cc.cliente.nombre} ${cc.cliente.apellido}`);
       router.refresh();
     } catch (err: unknown) {
@@ -254,17 +288,28 @@ export default function CobrosClient({ clientes, cobros }: Props) {
         setSavingModal(false);
         return;
       }
+      const esPago = formEstado === 'pagado' || formEstado === 'parcial';
+      const fechaPagoISO = esPago
+        ? (formFechaPago ? new Date(formFechaPago).toISOString() : new Date().toISOString())
+        : null;
+
       await upsertCobro(
         modalData.cliente.id,
         formEstado,
         monto,
-        formEstado === 'pagado' || formEstado === 'parcial' ? formTipoPago : null,
+        esPago ? formTipoPago : null,
         formNotas || null,
-        formEstado === 'pagado' || formEstado === 'parcial'
-          ? (formFechaPago ? new Date(formFechaPago).toISOString() : new Date().toISOString())
-          : null,
+        fechaPagoISO,
         modalData.cobro?.id
       );
+
+      // Registrar en libro diario solo si es una transición nueva a pagado/parcial
+      const estadoAnterior = modalData.cobro?.estado;
+      const eraYaPago = estadoAnterior === 'pagado' || estadoAnterior === 'parcial';
+      if (esPago && !eraYaPago) {
+        await registrarEnLibroDiario(modalData.cliente, monto, currentMonth, currentYear, fechaPagoISO);
+      }
+
       toast.success(`Cobro actualizado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);
       closeModal();
       router.refresh();
