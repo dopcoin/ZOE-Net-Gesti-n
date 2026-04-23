@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'recovery'>('login');
   const [recoverySent, setRecoverySent] = useState(false);
   const [recoveryLink, setRecoveryLink] = useState('');
+  const [recoveryMethod, setRecoveryMethod] = useState<'email' | 'link' | ''>('');
   const [inactiveMsg, setInactiveMsg] = useState(false);
 
   useEffect(() => {
@@ -62,7 +63,12 @@ export default function LoginPage() {
       } else {
         setRecoverySent(true);
         setRecoveryLink(result.recoveryLink || '');
-        toast.success('Enlace de recuperación generado');
+        setRecoveryMethod(result.method || 'email');
+        if (result.method === 'email') {
+          toast.success('Email de recuperación enviado');
+        } else {
+          toast.success('Enlace de recuperación generado');
+        }
       }
     } catch {
       toast.error('Error al enviar email de recuperación');
@@ -153,11 +159,21 @@ export default function LoginPage() {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mx-auto">
                     <Mail className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h2 className="text-lg font-semibold text-white">Enlace Generado</h2>
-                  {recoveryLink ? (
+                  {recoveryMethod === 'email' ? (
                     <>
+                      <h2 className="text-lg font-semibold text-white">Email Enviado</h2>
                       <p className="text-sm text-gray-400">
-                        Haz clic en el siguiente enlace para restablecer tu contraseña:
+                        Hemos enviado un enlace de recuperación a <span className="text-white font-medium">{email}</span>.
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Revisa tu bandeja de entrada y la carpeta de spam. El enlace expira en 24 horas.
+                      </p>
+                    </>
+                  ) : recoveryLink ? (
+                    <>
+                      <h2 className="text-lg font-semibold text-white">Enlace Generado</h2>
+                      <p className="text-sm text-gray-400">
+                        No se pudo enviar el email. Usa este enlace directo:
                       </p>
                       <a
                         href={recoveryLink}
@@ -171,8 +187,9 @@ export default function LoginPage() {
                     </>
                   ) : (
                     <>
+                      <h2 className="text-lg font-semibold text-white">Solicitud Enviada</h2>
                       <p className="text-sm text-gray-400">
-                        Revisa tu bandeja de entrada en <span className="text-white font-medium">{email}</span>.
+                        Si el email existe, recibirás un enlace de recuperación en <span className="text-white font-medium">{email}</span>.
                       </p>
                       <p className="text-xs text-gray-500">
                         Si no lo ves, revisa la carpeta de spam.

@@ -11,20 +11,16 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Check if this is a password recovery flow
-      const { data: { session } } = await supabase.auth.getSession();
-      // If the session was created from a recovery token, redirect to reset-password
-      if (session) {
-        const forwardedHost = request.headers.get('x-forwarded-host');
-        const isLocalEnv = process.env.NODE_ENV === 'development';
+      const forwardedHost = request.headers.get('x-forwarded-host');
+      const isLocalEnv = process.env.NODE_ENV === 'development';
+      const destination = next; // e.g., /reset-password or /dashboard
 
-        if (isLocalEnv) {
-          return NextResponse.redirect(`${origin}/reset-password`);
-        } else if (forwardedHost) {
-          return NextResponse.redirect(`https://${forwardedHost}${next}`);
-        } else {
-          return NextResponse.redirect(`${origin}${next}`);
-        }
+      if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}${destination}`);
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${destination}`);
+      } else {
+        return NextResponse.redirect(`${origin}${destination}`);
       }
     }
 

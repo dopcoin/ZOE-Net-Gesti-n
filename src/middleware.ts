@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check if authenticated user's profile is active
+  // Check if authenticated user's profile is active (only on protected routes)
   if (user && isProtectedRoute) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -45,18 +45,26 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profile && !profile.activo) {
-      // Inactive user — sign them out and redirect to login with message
+      // Inactive user — sign out and redirect with cookies properly set
       await supabase.auth.signOut();
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.searchParams.set('inactive', '1');
-      return NextResponse.redirect(url);
+      const redirectResponse = NextResponse.redirect(url);
+      // Copy the signOut cookies to the redirect response
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, {
+          path: '/',
+          maxAge: 0,
+        });
+      });
+      return redirectResponse;
     }
   }
 
-  // Redirect authenticated users away from login/registro, but NOT from reset-password
-  const isResetPage = request.nextUrl.pathname === '/reset-password';
-  if (user && isAuthPage && !isResetPage) {
+  // Redirect authenticated users away from login/registro
+  // But NOT from reset-password (user needs to stay there to change password)
+  if (user && isAuthPage && request.nextUrl.pathname !== '/reset-password') {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
@@ -66,6 +74,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Excluir rutas API, estáticos e imágenes — solo proteger páginas del dashboard
   matcher: ['/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };
