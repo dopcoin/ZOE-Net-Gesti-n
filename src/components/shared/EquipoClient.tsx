@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import type { Profile, Equipo, Rol } from '@/types';
 import { rolColor, equipoColor } from '@/lib/utils';
-import { UserCog, Search, Mail, Phone, Plus, Edit2, X, UserPlus, Shield } from 'lucide-react';
+import { UserCog, Search, Mail, Phone, Plus, Edit2, X, UserPlus, Shield, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -56,17 +56,20 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
   const [form, setForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState({ nombre: '', apellido: '', rol: 'soporte' as Rol, equipo: '' as Equipo | '', telefono: '', activo: true });
   const [loading, setLoading] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<Profile | null>(null);
+  const [tempPassword, setTempPassword] = useState('');
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setShowModal(false); setShowEditModal(false); }
+      if (e.key === 'Escape') { setShowModal(false); setShowEditModal(false); setShowResetPassword(false); }
     };
-    if (showModal || showEditModal) {
+    if (showModal || showEditModal || showResetPassword) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
     }
     return () => { document.removeEventListener('keydown', handleEscape); document.body.style.overflow = ''; };
-  }, [showModal, showEditModal]);
+  }, [showModal, showEditModal, showResetPassword]);
 
   const filtered = miembros.filter((m) => {
     const matchEquipo = equipoFilter === 'todos' || m.equipo === equipoFilter;
@@ -186,6 +189,54 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
     setShowEditModal(true);
   };
 
+  const openResetPassword = (m: Profile) => {
+    setResetPasswordTarget(m);
+    setTempPassword('');
+    setShowResetPassword(true);
+  };
+
+  function generateTempPassword(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordTarget || !tempPassword) return;
+    if (tempPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resetPasswordTarget.id,
+          newPassword: tempPassword,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al resetear contraseña');
+      }
+      toast.success(`Contraseña temporal asignada a ${resetPasswordTarget.nombre}`);
+      setShowResetPassword(false);
+      setResetPasswordTarget(null);
+      setTempPassword('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al resetear contraseña';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -239,10 +290,18 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
               {members.map((m) => (
                 <div key={m.id} className="card p-4 hover:bg-[#1C2333]/50 transition-colors group relative">
                   {isAdmin && (
-                    <button onClick={() => openEdit(m)}
-                      className="absolute top-3 right-3 p-1.5 rounded hover:bg-[#1C2333] text-gray-600 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Edit2 size={14} />
-                    </button>
+                    <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openResetPassword(m)}
+                        className="p-1.5 rounded hover:bg-[#1C2333] text-gray-600 hover:text-yellow-400"
+                        title="Resetear contraseña">
+                        <KeyRound size={14} />
+                      </button>
+                      <button onClick={() => openEdit(m)}
+                        className="p-1.5 rounded hover:bg-[#1C2333] text-gray-600 hover:text-blue-400"
+                        title="Editar perfil">
+                        <Edit2 size={14} />
+                      </button>
+                    </div>
                   )}
                   <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${getAvatarColor(m.nombre + (m.apellido || ''))}`}>
@@ -336,6 +395,66 @@ export default function EquipoClient({ miembros: initialMiembros }: Props) {
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
                 <button type="submit" disabled={loading} className="btn-primary">
                   {loading ? 'Creando...' : 'Crear Usuario'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Resetear Contraseña */}
+      {showResetPassword && resetPasswordTarget && (
+        <div className="modal-overlay" onClick={() => setShowResetPassword(false)}>
+          <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <KeyRound size={20} className="text-yellow-400" /> Resetear Contraseña
+              </h2>
+              <button onClick={() => setShowResetPassword(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleResetPassword} className="p-4 space-y-4">
+              <div className="bg-[#1C2333] rounded-lg p-3 text-sm text-gray-300">
+                <span className="text-white font-medium">{resetPasswordTarget.nombre} {resetPasswordTarget.apellido}</span>
+                {resetPasswordTarget.email && (
+                  <span className="text-gray-500 ml-2 text-xs">{resetPasswordTarget.email}</span>
+                )}
+              </div>
+              <div>
+                <label className="label">Nueva Contraseña Temporal</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="input flex-1"
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTempPassword(generateTempPassword())}
+                    className="btn-secondary text-xs px-3 whitespace-nowrap"
+                  >
+                    Generar
+                  </button>
+                </div>
+              </div>
+              {tempPassword && (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-sm">
+                  <p className="text-yellow-400 font-medium text-xs mb-1">Contraseña a asignar:</p>
+                  <p className="text-white font-mono text-lg tracking-wider select-all">{tempPassword}</p>
+                  <p className="text-yellow-400/60 text-xs mt-1">Copia y comparte esta contraseña con el usuario</p>
+                </div>
+              )}
+              <div className="bg-[#1C2333] rounded-lg p-3 text-xs text-gray-400 flex items-start gap-2">
+                <Shield size={14} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                <span>El usuario podrá iniciar sesión con esta nueva contraseña inmediatamente. Se recomienda que el usuario cambie su contraseña después.</span>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowResetPassword(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={loading || !tempPassword} className="btn-primary">
+                  {loading ? 'Reseteando...' : 'Asignar Contraseña'}
                 </button>
               </div>
             </form>
