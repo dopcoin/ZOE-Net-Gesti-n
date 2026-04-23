@@ -135,7 +135,8 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     monto: number,
     mes: number,
     anio: number,
-    fechaPago: string | null
+    fechaPago: string | null,
+    tipoPago?: TipoCobro | null
   ) {
     // Normalizar la fecha a formato YYYY-MM-DD
     const fecha = fechaPago
@@ -144,6 +145,11 @@ export default function CobrosClient({ clientes, cobros }: Props) {
         : fechaPago
       : new Date().toISOString().split('T')[0];
 
+    // Capitalizar método de pago para el libro diario
+    const metodo_pago = tipoPago
+      ? tipoPago.charAt(0).toUpperCase() + tipoPago.slice(1)
+      : null;
+
     const result = await createRegistroDiario({
       fecha,
       tipo: 'ingreso',
@@ -151,6 +157,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       descripcion: `${cliente.nombre} ${cliente.apellido} — ${meses[mes - 1]} ${anio}`,
       monto,
       referencia: null,
+      metodo_pago,
       registrado_por: profile?.id ?? null,
     });
 
@@ -207,7 +214,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       // Solo registrar en libro diario si no había cobro pagado antes
       const yaEstabaPagado = cc.cobro?.estado === 'pagado' || cc.cobro?.estado === 'parcial';
       if (!yaEstabaPagado) {
-        await registrarEnLibroDiario(cc.cliente, cc.cliente.monto_mensual, currentMonth, currentYear, fechaPago);
+        await registrarEnLibroDiario(cc.cliente, cc.cliente.monto_mensual, currentMonth, currentYear, fechaPago, 'efectivo');
       }
       toast.success(`Cobro registrado para ${cc.cliente.nombre} ${cc.cliente.apellido}`);
       router.refresh();
@@ -313,7 +320,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       const estadoAnterior = modalData.cobro?.estado;
       const eraYaPago = estadoAnterior === 'pagado' || estadoAnterior === 'parcial';
       if (esPago && !eraYaPago) {
-        await registrarEnLibroDiario(modalData.cliente, monto, currentMonth, currentYear, fechaPagoISO);
+        await registrarEnLibroDiario(modalData.cliente, monto, currentMonth, currentYear, fechaPagoISO, esPago ? formTipoPago : null);
       }
 
       toast.success(`Cobro actualizado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);

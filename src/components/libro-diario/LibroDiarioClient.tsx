@@ -14,6 +14,7 @@ import {
 
 const DEFAULT_CATEGORIAS_ENTRADA = ['Cobros clientes', 'Servicios adicionales', 'Instalaciones', 'Otros ingresos'];
 const DEFAULT_CATEGORIAS_SALIDA = ['Infraestructura', 'Salarios', 'Equipos', 'Servicios externos', 'Mantenimiento', 'Otros gastos'];
+const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
 
 const emptyForm = {
   fecha: new Date().toISOString().split('T')[0],
@@ -22,6 +23,8 @@ const emptyForm = {
   descripcion: '',
   monto: '' as string | number,
   referencia: '',
+  metodo_pago: '',
+  recibido_en: '',
 };
 
 interface Props {
@@ -134,6 +137,8 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
       descripcion: r.descripcion,
       monto: r.monto,
       referencia: r.referencia ?? '',
+      metodo_pago: r.metodo_pago ?? '',
+      recibido_en: r.recibido_en ?? '',
     });
     setEditingId(r.id);
     setModalMode('edit');
@@ -154,6 +159,8 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
       descripcion: formData.descripcion.trim(),
       monto: Number(formData.monto),
       referencia: formData.referencia.trim() || null,
+      metodo_pago: formData.metodo_pago.trim() || null,
+      recibido_en: formData.recibido_en.trim() || null,
       registrado_por: profile?.id ?? null,
     };
 
@@ -291,7 +298,7 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                 <th className="table-header">Tipo</th>
                 <th className="table-header">Categoría</th>
                 <th className="table-header">Descripción</th>
-                <th className="table-header">Referencia</th>
+                <th className="table-header">Método / Recibido</th>
                 <th className="table-header text-right">Monto</th>
                 <th className="table-header text-right">Acciones</th>
               </tr>
@@ -299,7 +306,7 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-cell text-center text-gray-500 py-12">
+                  <td colSpan={8} className="table-cell text-center text-gray-500 py-12">
                     No hay registros para este mes
                   </td>
                 </tr>
@@ -317,8 +324,25 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                       </span>
                     </td>
                     <td className="table-cell text-gray-300">{r.categoria}</td>
-                    <td className="table-cell text-gray-200">{r.descripcion}</td>
-                    <td className="table-cell text-gray-500 text-sm">{r.referencia ?? '—'}</td>
+                    <td className="table-cell text-gray-200">
+                      <div>{r.descripcion}</div>
+                      {r.referencia && (
+                        <div className="text-xs text-gray-500 mt-0.5">Ref: {r.referencia}</div>
+                      )}
+                    </td>
+                    <td className="table-cell">
+                      {r.metodo_pago && (
+                        <span className="badge bg-blue-500/15 text-blue-400 text-xs block w-fit mb-1">
+                          {r.metodo_pago}
+                        </span>
+                      )}
+                      {r.recibido_en && (
+                        <span className="text-xs text-gray-400">{r.recibido_en}</span>
+                      )}
+                      {!r.metodo_pago && !r.recibido_en && (
+                        <span className="text-gray-600">—</span>
+                      )}
+                    </td>
                     <td className={`table-cell text-right font-semibold ${
                       r.tipo === 'ingreso' ? 'text-emerald-400' : 'text-red-400'
                     }`}>
@@ -542,6 +566,33 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
                   className="input w-full"
                   placeholder="0.00"
                 />
+              </div>
+
+              {/* Método de pago + Recibido en — en grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Método de pago <span className="text-gray-600">(opcional)</span></label>
+                  <select
+                    value={formData.metodo_pago}
+                    onChange={(e) => setFormData((p) => ({ ...p, metodo_pago: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="">— Sin especificar —</option>
+                    {METODOS_PAGO.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Recibido por / en <span className="text-gray-600">(opcional)</span></label>
+                  <input
+                    type="text"
+                    value={formData.recibido_en}
+                    onChange={(e) => setFormData((p) => ({ ...p, recibido_en: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Ej: Oficina, Oscar, Banco..."
+                  />
+                </div>
               </div>
 
               {/* Referencia */}
