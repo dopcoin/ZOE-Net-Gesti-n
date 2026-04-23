@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
-import { formatDate, estadoInstalacionColor, prioridadColor } from '@/lib/utils';
+import { formatDate, estadoInstalacionColor, prioridadColor, meses } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { EstadoInstalacion, Prioridad } from '@/types';
+
+const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
 
 interface Instalacion {
   id: string;
@@ -19,6 +23,11 @@ interface Instalacion {
   fecha_programada: string | null;
   notas: string | null;
   tecnico_asignado: string | null;
+  costo?: number;
+  estado_cobro?: string;
+  descripcion_cobro?: string;
+  metodo_pago?: string | null;
+  recibido_en?: string | null;
   created_at: string;
   clientes?: { nombre: string; apellido: string };
 }
@@ -41,6 +50,7 @@ interface Props {
   instalaciones: Instalacion[];
   clientes: ClienteOption[];
   tecnicos: TecnicoOption[];
+  recibidosPor: string[];
 }
 
 const estadoLabels: Record<EstadoInstalacion, string> = {
@@ -62,10 +72,13 @@ const defaultForm = {
   costo: 0,
   estado_cobro: 'sin_costo' as 'sin_costo' | 'pendiente' | 'pagado',
   descripcion_cobro: '',
+  metodo_pago: '',
+  recibido_en: '',
 };
 
-export default function InstalacionesClient({ instalaciones: initial, clientes, tecnicos }: Props) {
+export default function InstalacionesClient({ instalaciones: initial, clientes, tecnicos, recibidosPor: initialRecibidosPor }: Props) {
   const router = useRouter();
+  const { profile } = useAuthStore();
   const [instalaciones, setInstalaciones] = useState(initial);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoInstalacion | 'todos'>('todos');
@@ -73,6 +86,15 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
   const [editing, setEditing] = useState<Instalacion | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
+
+  // Recibido por — creatable select
+  const [localRecibidosPor, setLocalRecibidosPor] = useState<string[]>([]);
+  const [showNewRecibidoEn, setShowNewRecibidoEn] = useState(false);
+  const [newRecibidoEn, setNewRecibidoEn] = useState('');
+
+  const allRecibidosPor = useMemo(() => {
+    return Array.from(new Set([...initialRecibidosPor, ...localRecibidosPor])).sort();
+  }, [initialRecibidosPor, localRecibidosPor]);
 
   const counts = {
     todos: instalaciones.length,
@@ -95,9 +117,10 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
 
   function closeModal() {
     setShowModal(false);
+    setShowNewRecibidoEn(false);
+    setNewRecibidoEn('');
   }
 
-  // Escape key handler and body overflow cleanup
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeModal();
@@ -115,12 +138,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
   function openCreate() {
     setEditing(null);
     setForm(defaultForm);
+    setShowNewRecibidoEn(false);
+    setNewRecibidoEn('');
     setShowModal(true);
   }
 
   function openEdit(inst: Instalacion) {
     setEditing(inst);
-    const i = inst as Instalacion & { costo?: number; estado_cobro?: string; descripcion_cobro?: string };
     setForm({
       cliente_id: inst.cliente_id,
       tipo: inst.tipo,
@@ -130,16 +154,47 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       fecha_programada: inst.fecha_programada ?? '',
       notas: inst.notas ?? '',
       tecnico_asignado: inst.tecnico_asignado ?? '',
-      costo: i.costo ?? 0,
-      estado_cobro: (i.estado_cobro as 'sin_costo' | 'pendiente' | 'pagado') ?? 'sin_costo',
-      descripcion_cobro: i.descripcion_cobro ?? '',
+      costo: inst.costo ?? 0,
+      estado_cobro: (inst.estado_cobro as 'sin_costo' | 'pendiente' | 'pagado') ?? 'sin_costo',
+      descripcion_cobro: inst.descripcion_cobro ?? '',
+      metodo_pago: inst.metodo_pago ?? '',
+      recibido_en: inst.recibido_en ?? '',
     });
+    setShowNewRecibidoEn(false);
+    setNewRecibidoEn('');
     setShowModal(true);
+  }
+
+  // Auto-crear entrada en Libro Diario cuando el cobro de instalación es pagado
+  async function registrarEnLibroDiario(inst: Instalacion, monto: number, clienteNombre: string) {
+    const now = new Date();
+    const fecha = now.toISOString().split('T')[0];
+    const mes = now.getMonth() + 1;
+    const anio = now.getFullYear();
+
+    const payload: Record<string, unknown> = {
+      fecha,
+      tipo: 'ingreso',
+      categoria: 'Instalaciones',
+      descripcion: `Instalación — ${clienteNombre} (${inst.tipo})`,
+      monto,
+      referencia: null,
+      metodo_pago: form.metodo_pago || null,
+      recibido_en: form.recibido_en || null,
+    };
+    if (profile?.id) payload.registrado_por = profile.id;
+
+    const supabase = createClient();
+    const { error } = await supabase.from('libro_diario').insert(payload);
+    if (error) {
+      console.error('[LibroDiario] Error instalación:', error);
+      toast.warning(`Instalación guardada. Error en Libro Diario: ${error.message}`);
+    }
   }
 
   async function handleSave() {
     if (!form.cliente_id || !form.direccion) {
-      toast.error('Cliente y direccion son requeridos');
+      toast.error('Cliente y dirección son requeridos');
       return;
     }
     setLoading(true);
@@ -155,6 +210,8 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       costo: form.costo || 0,
       estado_cobro: form.estado_cobro,
       descripcion_cobro: form.descripcion_cobro || null,
+      metodo_pago: form.estado_cobro === 'pagado' ? (form.metodo_pago || null) : null,
+      recibido_en: form.estado_cobro === 'pagado' ? (form.recibido_en || null) : null,
     };
 
     if (editing) {
@@ -164,7 +221,14 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         setLoading(false);
         return;
       }
-      toast.success('Instalacion actualizada');
+      toast.success('Instalación actualizada');
+      // Registrar en libro diario si transicionó a pagado
+      const eraYaPagado = editing.estado_cobro === 'pagado';
+      if (form.estado_cobro === 'pagado' && !eraYaPagado && form.costo > 0) {
+        const clienteNombre = clientes.find((c) => c.id === form.cliente_id);
+        const nombre = clienteNombre ? `${clienteNombre.nombre} ${clienteNombre.apellido}` : 'Cliente';
+        await registrarEnLibroDiario(editing, form.costo, nombre);
+      }
     } else {
       const result = await createInstalacion(payload);
       if (result.error) {
@@ -172,7 +236,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         setLoading(false);
         return;
       }
-      toast.success('Instalacion creada');
+      toast.success('Instalación creada');
+      // Registrar en libro diario si se crea directamente como pagado
+      if (form.estado_cobro === 'pagado' && form.costo > 0) {
+        const clienteNombre = clientes.find((c) => c.id === form.cliente_id);
+        const nombre = clienteNombre ? `${clienteNombre.nombre} ${clienteNombre.apellido}` : 'Cliente';
+        await registrarEnLibroDiario({ id: '', cliente_id: form.cliente_id, tipo: form.tipo, direccion: form.direccion, prioridad: form.prioridad, estado: form.estado, fecha_programada: null, notas: null, tecnico_asignado: null, created_at: '' }, form.costo, nombre);
+      }
     }
     setShowModal(false);
     router.refresh();
@@ -180,13 +250,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar esta instalacion?')) return;
+    if (!confirm('¿Eliminar esta instalación?')) return;
     const result = await deleteInstalacion(id);
     if (result.error) {
       toast.error(getErrorMessage(result.error));
       return;
     }
-    toast.success('Instalacion eliminada');
+    toast.success('Instalación eliminada');
     setInstalaciones((prev) => prev.filter((i) => i.id !== id));
     router.refresh();
   }
@@ -201,7 +271,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         </div>
         <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <Plus size={16} />
-          Nueva Instalacion
+          Nueva Instalación
         </button>
       </div>
 
@@ -228,7 +298,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
-          placeholder="Buscar por cliente, direccion, tecnico..."
+          placeholder="Buscar por cliente, dirección, técnico..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="input pl-9"
@@ -242,7 +312,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
             <tr className="border-b border-[#1F2937]">
               <th className="table-header">Cliente</th>
               <th className="table-header">Tipo</th>
-              <th className="table-header">Direccion</th>
+              <th className="table-header">Dirección</th>
               <th className="table-header">Prioridad</th>
               <th className="table-header">Estado</th>
               <th className="table-header">Fecha</th>
@@ -253,7 +323,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="table-cell text-center text-gray-500 py-8">
+                <td colSpan={8} className="table-cell text-center text-gray-500 py-8">
                   No se encontraron instalaciones
                 </td>
               </tr>
@@ -275,21 +345,31 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                   </td>
                   <td className="table-cell">{formatDate(inst.fecha_programada)}</td>
                   <td className="table-cell">
-                    {(() => {
-                      const i = inst as Instalacion & { costo?: number; estado_cobro?: string };
-                      if (!i.estado_cobro || i.estado_cobro === 'sin_costo') return <span className="text-gray-600 text-xs">—</span>;
-                      return (
+                    {!inst.estado_cobro || inst.estado_cobro === 'sin_costo' ? (
+                      <span className="text-gray-600 text-xs">—</span>
+                    ) : (
+                      <div>
                         <div className="flex items-center gap-1">
-                          <DollarSign size={12} className={i.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'} />
-                          <span className={`text-xs font-medium ${i.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                            {formatCurrency(i.costo ?? 0)}
+                          <DollarSign size={12} className={inst.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'} />
+                          <span className={`text-xs font-medium ${inst.estado_cobro === 'pagado' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                            {formatCurrency(inst.costo ?? 0)}
                           </span>
-                          <span className={`badge text-xs ${i.estado_cobro === 'pagado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                            {i.estado_cobro === 'pagado' ? 'Pagado' : 'Pendiente'}
+                          <span className={`badge text-xs ${inst.estado_cobro === 'pagado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                            {inst.estado_cobro === 'pagado' ? 'Pagado' : 'Pendiente'}
                           </span>
                         </div>
-                      );
-                    })()}
+                        {inst.estado_cobro === 'pagado' && (inst.metodo_pago || inst.recibido_en) && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {inst.metodo_pago && (
+                              <span className="badge bg-blue-500/15 text-blue-400 text-xs">{inst.metodo_pago}</span>
+                            )}
+                            {inst.recibido_en && (
+                              <span className="text-xs text-gray-500">{inst.recibido_en}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="table-cell">
                     <div className="flex items-center gap-1">
@@ -314,13 +394,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
           <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
               <h2 className="text-lg font-semibold text-white">
-                {editing ? 'Editar Instalacion' : 'Nueva Instalacion'}
+                {editing ? 'Editar Instalación' : 'Nueva Instalación'}
               </h2>
               <button onClick={closeModal} className="p-1 rounded hover:bg-[#2A3142] text-gray-400">
                 <X size={18} />
               </button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
                 <label className="label">Cliente *</label>
                 <select
@@ -362,13 +442,13 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                 </div>
               </div>
               <div>
-                <label className="label">Direccion *</label>
+                <label className="label">Dirección *</label>
                 <input
                   type="text"
                   value={form.direccion}
                   onChange={(e) => setForm({ ...form, direccion: e.target.value })}
                   className="input"
-                  placeholder="Direccion de la instalacion"
+                  placeholder="Dirección de la instalación"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -396,7 +476,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                 </div>
               </div>
               <div>
-                <label className="label">Tecnico Asignado</label>
+                <label className="label">Técnico Asignado</label>
                 <select
                   value={form.tecnico_asignado}
                   onChange={(e) => setForm({ ...form, tecnico_asignado: e.target.value })}
@@ -410,6 +490,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                   ))}
                 </select>
               </div>
+
               {/* Cobro */}
               <div className="border-t border-[#1F2937] pt-3">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Cobro de instalación</p>
@@ -439,6 +520,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                     </select>
                   </div>
                 </div>
+
                 {form.estado_cobro !== 'sin_costo' && (
                   <div className="mt-3">
                     <label className="label">Descripción del cobro</label>
@@ -451,7 +533,97 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                     />
                   </div>
                 )}
+
+                {/* Método de pago + Recibido por — solo cuando está pagado */}
+                {form.estado_cobro === 'pagado' && (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Método de pago <span className="text-gray-600">(opcional)</span></label>
+                      <select
+                        value={form.metodo_pago}
+                        onChange={(e) => setForm({ ...form, metodo_pago: e.target.value })}
+                        className="input"
+                      >
+                        <option value="">— Sin especificar —</option>
+                        {METODOS_PAGO.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Recibido por <span className="text-gray-600">(opcional)</span></label>
+                      {showNewRecibidoEn ? (
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            value={newRecibidoEn}
+                            onChange={(e) => setNewRecibidoEn(e.target.value)}
+                            className="input w-full"
+                            placeholder="Ej: Oficina, Juan..."
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = newRecibidoEn.trim();
+                                if (val) {
+                                  setLocalRecibidosPor((p) => Array.from(new Set([...p, val])));
+                                  setForm((f) => ({ ...f, recibido_en: val }));
+                                }
+                                setShowNewRecibidoEn(false);
+                                setNewRecibidoEn('');
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newRecibidoEn.trim();
+                              if (val) {
+                                setLocalRecibidosPor((p) => Array.from(new Set([...p, val])));
+                                setForm((f) => ({ ...f, recibido_en: val }));
+                              }
+                              setShowNewRecibidoEn(false);
+                              setNewRecibidoEn('');
+                            }}
+                            className="btn-primary text-xs px-2 whitespace-nowrap"
+                          >
+                            OK
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowNewRecibidoEn(false); setNewRecibidoEn(''); }}
+                            className="btn-secondary text-xs px-2"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          <select
+                            value={form.recibido_en}
+                            onChange={(e) => setForm({ ...form, recibido_en: e.target.value })}
+                            className="input w-full"
+                          >
+                            <option value="">— Sin especificar —</option>
+                            {allRecibidosPor.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setShowNewRecibidoEn(true)}
+                            className="btn-secondary text-xs px-2 whitespace-nowrap flex items-center gap-1"
+                            title="Agregar nuevo"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="label">Notas</label>
                 <textarea
