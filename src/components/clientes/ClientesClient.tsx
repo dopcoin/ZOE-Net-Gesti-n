@@ -325,6 +325,7 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                 <th className="table-header">Monto</th>
                 <th className="table-header">Estado</th>
                 <th className="table-header">Localidad</th>
+                <th className="table-header">F. Inicio</th>
                 <th className="table-header">Telefono</th>
                 <th className="table-header text-right">Acciones</th>
               </tr>
@@ -355,6 +356,9 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                       </span>
                     </td>
                     <td className="table-cell text-gray-300">{cliente.localidad ?? '—'}</td>
+                    <td className="table-cell text-gray-300">
+                      {cliente.fecha_instalacion ? formatDate(cliente.fecha_instalacion) : '—'}
+                    </td>
                     <td className="table-cell text-gray-300">{cliente.telefono ?? '—'}</td>
                     <td className="table-cell text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -579,6 +583,16 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="label">Fecha de Inicio</label>
+                  <input
+                    name="fecha_instalacion"
+                    type="date"
+                    value={formData.fecha_instalacion ?? ''}
+                    onChange={handleChange}
+                    className="input w-full"
+                  />
                 </div>
                 {/* Beca toggle - full width */}
                 <div className="md:col-span-2 border-t border-[#1F2937] pt-4">
