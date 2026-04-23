@@ -70,6 +70,7 @@ export interface Cobro {
   estado: EstadoCobro;
   tipo_pago: TipoCobro | null;
   fecha_pago: string | null;
+  recibido_por: string | null;
   notas: string | null;
   created_by: string | null;
   created_at: string;

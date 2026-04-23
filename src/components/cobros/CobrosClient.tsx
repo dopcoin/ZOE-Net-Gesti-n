@@ -7,12 +7,13 @@ import { createRegistroDiario } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2, Plus } from 'lucide-react';
 import type { Cliente, Cobro, EstadoCobro, TipoCobro } from '@/types';
 
 interface Props {
   clientes: Cliente[];
   cobros: Cobro[];
+  recibidosPor: string[];
 }
 
 interface ClienteCobro {
@@ -26,7 +27,7 @@ interface ModalData {
   cobro: Cobro | null;
 }
 
-export default function CobrosClient({ clientes, cobros }: Props) {
+export default function CobrosClient({ clientes, cobros, recibidosPor: initialRecibidosPor }: Props) {
   const router = useRouter();
   const { profile } = useAuthStore();
   const now = new Date();
@@ -42,6 +43,10 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   const [formNotas, setFormNotas] = useState('');
   const [formFechaPago, setFormFechaPago] = useState('');
   const [savingModal, setSavingModal] = useState(false);
+  const [formRecibidoPor, setFormRecibidoPor] = useState('');
+  const [localRecibidosPor, setLocalRecibidosPor] = useState<string[]>([]);
+  const [showNewRecibidoPor, setShowNewRecibidoPor] = useState(false);
+  const [newRecibidoPor, setNewRecibidoPor] = useState('');
   const [localidadFilter, setLocalidadFilter] = useState<string | null>(null);
 
   // Historial modal
@@ -54,6 +59,10 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     const locs = clientes.map((c) => c.localidad).filter((l): l is string => !!l);
     return Array.from(new Set(locs)).sort();
   }, [clientes]);
+
+  const allRecibidosPor = useMemo(() => {
+    return Array.from(new Set([...initialRecibidosPor, ...localRecibidosPor])).sort();
+  }, [initialRecibidosPor, localRecibidosPor]);
 
   const clientesCobros = useMemo<ClienteCobro[]>(() => {
     return clientes
@@ -136,7 +145,8 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     mes: number,
     anio: number,
     fechaPago: string | null,
-    tipoPago?: TipoCobro | null
+    tipoPago?: TipoCobro | null,
+    recibidoPor?: string | null
   ) {
     // Normalizar la fecha a formato YYYY-MM-DD
     const fecha = fechaPago
@@ -158,6 +168,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       monto,
       referencia: null,
       metodo_pago,
+      recibido_en: recibidoPor ?? null,
       registrado_por: profile?.id ?? null,
     });
 
@@ -174,7 +185,8 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     tipoPago?: TipoCobro | null,
     notas?: string | null,
     fechaPago?: string | null,
-    existingCobroId?: string | null
+    existingCobroId?: string | null,
+    recibidoPor?: string | null
   ) {
     const supabase = createClient();
     const payload: Record<string, unknown> = {
@@ -185,6 +197,7 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       estado,
       tipo_pago: tipoPago ?? (estado === 'pagado' ? 'efectivo' : null),
       fecha_pago: fechaPago ?? (estado === 'pagado' ? new Date().toISOString() : null),
+      recibido_por: recibidoPor ?? null,
       notas: notas ?? null,
     };
 
@@ -254,18 +267,23 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     setFormMonto(cc.cobro?.monto?.toString() ?? cc.cliente.monto_mensual.toString());
     setFormEstado((cc.cobro?.estado as EstadoCobro) ?? 'pagado');
     setFormTipoPago((cc.cobro?.tipo_pago as TipoCobro) ?? 'efectivo');
+    setFormRecibidoPor(cc.cobro?.recibido_por ?? '');
     setFormNotas(cc.cobro?.notas ?? '');
     setFormFechaPago(
       cc.cobro?.fecha_pago
         ? new Date(cc.cobro.fecha_pago).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0]
     );
+    setShowNewRecibidoPor(false);
+    setNewRecibidoPor('');
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
     setModalData(null);
+    setShowNewRecibidoPor(false);
+    setNewRecibidoPor('');
   }
 
   async function openHistorial(cliente: Cliente) {
@@ -313,14 +331,18 @@ export default function CobrosClient({ clientes, cobros }: Props) {
         esPago ? formTipoPago : null,
         formNotas || null,
         fechaPagoISO,
-        modalData.cobro?.id
+        modalData.cobro?.id,
+        esPago ? (formRecibidoPor || null) : null
       );
 
       // Registrar en libro diario solo si es una transición nueva a pagado/parcial
       const estadoAnterior = modalData.cobro?.estado;
       const eraYaPago = estadoAnterior === 'pagado' || estadoAnterior === 'parcial';
       if (esPago && !eraYaPago) {
-        await registrarEnLibroDiario(modalData.cliente, monto, currentMonth, currentYear, fechaPagoISO, esPago ? formTipoPago : null);
+        await registrarEnLibroDiario(
+          modalData.cliente, monto, currentMonth, currentYear,
+          fechaPagoISO, formTipoPago, formRecibidoPor || null
+        );
       }
 
       toast.success(`Cobro actualizado para ${modalData.cliente.nombre} ${modalData.cliente.apellido}`);
@@ -686,6 +708,77 @@ export default function CobrosClient({ clientes, cobros }: Props) {
                       <option value="tarjeta">Tarjeta</option>
                       <option value="otro">Otro</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="label">Recibido por <span className="text-gray-600">(opcional)</span></label>
+                    {showNewRecibidoPor ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newRecibidoPor}
+                          onChange={(e) => setNewRecibidoPor(e.target.value)}
+                          className="input w-full"
+                          placeholder="Ej: Oficina, Juan, Banco..."
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = newRecibidoPor.trim();
+                              if (val) {
+                                setLocalRecibidosPor((p) => Array.from(new Set([...p, val])));
+                                setFormRecibidoPor(val);
+                              }
+                              setShowNewRecibidoPor(false);
+                              setNewRecibidoPor('');
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = newRecibidoPor.trim();
+                            if (val) {
+                              setLocalRecibidosPor((p) => Array.from(new Set([...p, val])));
+                              setFormRecibidoPor(val);
+                            }
+                            setShowNewRecibidoPor(false);
+                            setNewRecibidoPor('');
+                          }}
+                          className="btn-primary text-xs px-3 whitespace-nowrap"
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewRecibidoPor(false); setNewRecibidoPor(''); }}
+                          className="btn-secondary text-xs px-2"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <select
+                          value={formRecibidoPor}
+                          onChange={(e) => setFormRecibidoPor(e.target.value)}
+                          className="input w-full"
+                        >
+                          <option value="">— Sin especificar —</option>
+                          {allRecibidosPor.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewRecibidoPor(true)}
+                          className="btn-secondary text-xs px-3 whitespace-nowrap flex items-center gap-1"
+                          title="Agregar nuevo"
+                        >
+                          <Plus size={12} />
+                          Nuevo
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="label">Fecha de Pago</label>

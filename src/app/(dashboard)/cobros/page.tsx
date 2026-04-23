@@ -13,5 +13,14 @@ export default async function CobrosPage() {
     .select('*, clientes(nombre, apellido, plan, monto_mensual)')
     .order('created_at', { ascending: false });
 
-  return <CobrosClient clientes={clientes ?? []} cobros={cobros ?? []} />;
+  // Distinct "recibido_por" values for the creatable select
+  const { data: recibidosRaw } = await supabase
+    .from('cobros')
+    .select('recibido_por')
+    .not('recibido_por', 'is', null);
+  const recibidosPor = Array.from(
+    new Set((recibidosRaw ?? []).map((r: { recibido_por: string }) => r.recibido_por).filter(Boolean))
+  ).sort() as string[];
+
+  return <CobrosClient clientes={clientes ?? []} cobros={cobros ?? []} recibidosPor={recibidosPor} />;
 }
