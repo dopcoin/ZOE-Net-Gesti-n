@@ -25,13 +25,32 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/reset-password';
+  const publicPages = ['/login', '/reset-password', '/registro'];
+  const isAuthPage = publicPages.includes(request.nextUrl.pathname);
   const isProtectedRoute = !isAuthPage && request.nextUrl.pathname !== '/';
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
+  }
+
+  // Check if authenticated user's profile is active
+  if (user && isProtectedRoute) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('activo')
+      .eq('id', user.id)
+      .single();
+
+    if (profile && !profile.activo) {
+      // Inactive user — sign them out and redirect to login with message
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('inactive', '1');
+      return NextResponse.redirect(url);
+    }
   }
 
   if (user && isAuthPage) {

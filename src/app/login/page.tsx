@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Wifi, Eye, EyeOff, ArrowLeft, Mail } from 'lucide-react';
@@ -14,6 +15,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'recovery'>('login');
   const [recoverySent, setRecoverySent] = useState(false);
+  const [inactiveMsg, setInactiveMsg] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('inactive') === '1') {
+      setInactiveMsg(true);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +84,11 @@ export default function LoginPage() {
 
         {mode === 'login' ? (
           <>
+            {inactiveMsg && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-4 text-sm text-yellow-300 text-center">
+                Tu cuenta aún no ha sido activada por un administrador. Contacta al administrador para obtener acceso.
+              </div>
+            )}
             <form onSubmit={handleLogin} className="card p-6 space-y-4">
               <div>
                 <label className="label">Email</label>
@@ -114,12 +128,20 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <button
-              onClick={() => { setMode('recovery'); setRecoverySent(false); }}
-              className="w-full text-center text-sm text-blue-400 hover:text-blue-300 mt-4 transition-colors"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
+            <div className="flex flex-col items-center gap-2 mt-4">
+              <button
+                onClick={() => { setMode('recovery'); setRecoverySent(false); }}
+                className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+              <Link
+                href="/registro"
+                className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                Obtener Acceso
+              </Link>
+            </div>
           </>
         ) : (
           <>
