@@ -27,7 +27,8 @@ export async function middleware(request: NextRequest) {
 
   const publicPages = ['/login', '/reset-password', '/registro'];
   const isAuthPage = publicPages.includes(request.nextUrl.pathname);
-  const isProtectedRoute = !isAuthPage && request.nextUrl.pathname !== '/';
+  const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback');
+  const isProtectedRoute = !isAuthPage && !isAuthCallback && request.nextUrl.pathname !== '/';
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();

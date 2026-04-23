@@ -17,21 +17,25 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Supabase handles the token exchange automatically when the page loads
-    // with the hash fragment from the email link
     const supabase = createClient();
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+
+    // Listen for auth state changes (PASSWORD_RECOVERY event from token exchange)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setSessionReady(true);
       }
     });
 
-    // Also check if there's already a session (user might have arrived with valid token)
+    // Also check if there's already a session (user arrived via auth/callback)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSessionReady(true);
       }
     });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleReset = async (e: React.FormEvent) => {
