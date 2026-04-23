@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 import type { Factura, FacturaItem, EstadoFactura } from '@/types';
 import {
   createFactura,
@@ -52,6 +54,7 @@ const emptyForm = {
 
 export default function FacturasClient({ facturas: initial, clientes }: Props) {
   const router = useRouter();
+  const { profile } = useAuthStore();
 
   const [facturas, setFacturas] = useState(initial);
   const [modalOpen, setModalOpen] = useState(false);
@@ -177,6 +180,25 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
     });
   };
 
+  // ---------- Libro Diario ----------
+  const registrarEnLibroDiario = async (numero: string, clienteNombre: string | null, total: number) => {
+    const supabase = createClient();
+    const payload: Record<string, unknown> = {
+      fecha: new Date().toISOString().split('T')[0],
+      tipo: 'ingreso',
+      categoria: 'Facturas',
+      descripcion: `Factura ${numero}${clienteNombre ? ` — ${clienteNombre}` : ''}`,
+      monto: total,
+      referencia: numero,
+    };
+    if (profile?.id) payload.registrado_por = profile.id;
+    const { error } = await supabase.from('libro_diario').insert(payload);
+    if (error) {
+      console.error('[LibroDiario] Error factura:', error);
+      toast.warning(`Factura guardada. Error en Libro Diario: ${error.message}`);
+    }
+  };
+
   // ---------- Save ----------
   const handleSave = async () => {
     if (!formData.numero.trim()) {
@@ -218,6 +240,12 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
           return;
         }
         toast.success('Factura creada exitosamente');
+        // Registrar en libro diario si se crea como pagada
+        if (formData.estado === 'pagada' && total > 0) {
+          const cliente = clientes.find((c) => c.id === formData.cliente_id);
+          const nombre = cliente ? `${cliente.nombre} ${cliente.apellido}` : null;
+          await registrarEnLibroDiario(formData.numero, nombre, total);
+        }
       } else if (selectedFactura) {
         const result = await updateFactura(selectedFactura.id, payload);
         if (result.error) {
@@ -225,6 +253,13 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
           return;
         }
         toast.success('Factura actualizada exitosamente');
+        // Registrar en libro diario si transicionó a pagada
+        const eraYaPagada = selectedFactura.estado === 'pagada';
+        if (formData.estado === 'pagada' && !eraYaPagada && total > 0) {
+          const cliente = clientes.find((c) => c.id === formData.cliente_id);
+          const nombre = cliente ? `${cliente.nombre} ${cliente.apellido}` : null;
+          await registrarEnLibroDiario(formData.numero, nombre, total);
+        }
       }
 
       closeModal();
@@ -250,7 +285,7 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
   };
 
   // ---------- Inline estado change ----------
-  const handleEstadoChange = async (factura: Factura, estado: EstadoFactura) => {
+  const handleEstadoChange = async (factura: Factura & { clientes?: { nombre: string; apellido: string } }, estado: EstadoFactura) => {
     const result = await updateFactura(factura.id, { estado });
     if (result.error) {
       toast.error(getErrorMessage(result.error));
@@ -260,6 +295,13 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       prev.map((f) => (f.id === factura.id ? { ...f, estado } : f))
     );
     toast.success(`Estado cambiado a ${estado}`);
+    // Registrar en libro diario si cambia A pagada desde otro estado
+    if (estado === 'pagada' && factura.estado !== 'pagada' && (factura.total ?? 0) > 0) {
+      const nombre = factura.clientes
+        ? `${factura.clientes.nombre} ${factura.clientes.apellido}`
+        : null;
+      await registrarEnLibroDiario(factura.numero, nombre, factura.total ?? 0);
+    }
     router.refresh();
   };
 

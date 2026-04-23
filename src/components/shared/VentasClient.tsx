@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 import { createVenta, updateVenta, deleteVenta, getErrorMessage } from '@/lib/services';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -47,6 +48,7 @@ const defaultForm = {
 
 export default function VentasClient({ ventas: initial, mercancia, clientes, revendedores }: Props) {
   const router = useRouter();
+  const { profile } = useAuthStore();
   const [ventas, setVentas] = useState(initial);
   const [search, setSearch] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<TipoVenta | 'todos'>('todos');
@@ -125,6 +127,24 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
     };
   }, [showModal]);
 
+  async function registrarEnLibroDiario(productoNombre: string, total: number, tipo: TipoVenta, destinatario: string | null) {
+    const supabase = createClient();
+    const payload: Record<string, unknown> = {
+      fecha: new Date().toISOString().split('T')[0],
+      tipo: 'ingreso',
+      categoria: 'Ventas',
+      descripcion: `Venta — ${productoNombre}${destinatario ? ` (${destinatario})` : ''}`,
+      monto: total,
+      referencia: null,
+    };
+    if (profile?.id) payload.registrado_por = profile.id;
+    const { error } = await supabase.from('libro_diario').insert(payload);
+    if (error) {
+      console.error('[LibroDiario] Error venta:', error);
+      toast.warning(`Venta registrada. Error en Libro Diario: ${error.message}`);
+    }
+  }
+
   async function handleSave() {
     if (!form.mercancia_id) { toast.error('Selecciona un producto'); return; }
     if (form.tipo === 'revendedor' && !form.revendedor_id) { toast.error('Selecciona un revendedor'); return; }
@@ -169,11 +189,26 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
       const result = await updateVenta(editingVenta.id, payload);
       if (result.error) { toast.error(getErrorMessage(result.error)); setLoading(false); return; }
       toast.success('Venta actualizada');
+      // Registrar en libro diario si transicionó a completada
+      const eraCompletada = editingVenta.estado === 'completada';
+      if (form.estado === 'completada' && !eraCompletada) {
+        const dest = form.tipo === 'revendedor'
+          ? revendedores.find((r) => r.id === form.revendedor_id)?.nombre ?? null
+          : clientes.find((c) => c.id === form.cliente_id)?.nombre ?? null;
+        await registrarEnLibroDiario(product?.nombre ?? 'Producto', liveTotal, form.tipo, dest);
+      }
     } else {
       // New sale — stock deduction handled by DB trigger, but update locally too
       const result = await createVenta(payload);
       if (result.error) { toast.error(getErrorMessage(result.error)); setLoading(false); return; }
       toast.success('Venta registrada');
+      // Registrar en libro diario si la venta es completada
+      if (form.estado === 'completada') {
+        const dest = form.tipo === 'revendedor'
+          ? revendedores.find((r) => r.id === form.revendedor_id)?.nombre ?? null
+          : clientes.find((c) => c.id === form.cliente_id)?.nombre ?? null;
+        await registrarEnLibroDiario(product?.nombre ?? 'Producto', liveTotal, form.tipo, dest);
+      }
     }
 
     closeModal();
