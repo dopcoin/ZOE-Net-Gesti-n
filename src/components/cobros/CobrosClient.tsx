@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { createRegistroDiario } from '@/lib/services';
+import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2 } from 'lucide-react';
@@ -27,6 +28,7 @@ interface ModalData {
 
 export default function CobrosClient({ clientes, cobros }: Props) {
   const router = useRouter();
+  const { profile } = useAuthStore();
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
@@ -135,8 +137,11 @@ export default function CobrosClient({ clientes, cobros }: Props) {
     anio: number,
     fechaPago: string | null
   ) {
+    // Normalizar la fecha a formato YYYY-MM-DD
     const fecha = fechaPago
-      ? new Date(fechaPago).toISOString().split('T')[0]
+      ? fechaPago.includes('T')
+        ? fechaPago.split('T')[0]
+        : fechaPago
       : new Date().toISOString().split('T')[0];
 
     const result = await createRegistroDiario({
@@ -146,12 +151,12 @@ export default function CobrosClient({ clientes, cobros }: Props) {
       descripcion: `${cliente.nombre} ${cliente.apellido} — ${meses[mes - 1]} ${anio}`,
       monto,
       referencia: null,
-      registrado_por: null,
+      registrado_por: profile?.id ?? null,
     });
 
     if (result.error) {
       console.error('[LibroDiario] Error:', result.error);
-      toast.warning(`Cobro registrado, pero falló el Libro Diario: ${result.error.message}`);
+      toast.warning(`Cobro registrado. Error en Libro Diario: ${result.error.message}`);
     }
   }
 
