@@ -54,7 +54,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (user && isAuthPage) {
+  // Redirect authenticated users away from login/registro, but NOT from reset-password
+  const isResetPage = request.nextUrl.pathname === '/reset-password';
+  if (user && isAuthPage && !isResetPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

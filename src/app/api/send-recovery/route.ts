@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const origin = req.headers.get('origin') || req.nextUrl.origin;
-    const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+    const redirectTo = `${origin}/reset-password`;
 
     // Call Supabase GoTrue admin API directly via REST
     const response = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
