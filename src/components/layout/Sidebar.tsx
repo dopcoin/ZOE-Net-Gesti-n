@@ -8,7 +8,7 @@ import { useAppStore } from '@/store/appStore';
 import {
   LayoutDashboard, Users, CreditCard, Package, Repeat2,
   Wrench, ShoppingCart, ClipboardCheck, FileText, BookOpen,
-  CheckSquare, UserCog, BarChart3, ChevronLeft, ChevronRight, X,
+  CheckSquare, UserCog, BarChart3, PiggyBank, ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import type { Rol } from '@/types';
 
@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
   { href: '/conciliacion', label: 'Conciliación', icon: <ClipboardCheck size={20} />, roles: ['admin', 'administrativo'] },
   { href: '/facturas', label: 'Facturas', icon: <FileText size={20} />, roles: ['admin', 'financiero'] },
   { href: '/libro-diario', label: 'Libro Diario', icon: <BookOpen size={20} />, roles: ['admin', 'financiero'] },
+  { href: '/finanzas', label: 'Finanzas', icon: <PiggyBank size={20} />, roles: ['admin', 'financiero'] },
   { href: '/tareas', label: 'Tareas', icon: <CheckSquare size={20} />, roles: ['admin', 'soporte', 'financiero', 'administrativo'] },
   { href: '/equipo', label: 'Equipo', icon: <UserCog size={20} />, roles: ['admin', 'administrativo'] },
   { href: '/reportes', label: 'Reportes', icon: <BarChart3 size={20} />, roles: ['admin', 'financiero'] },

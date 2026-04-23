@@ -2,25 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @layer base {
   body {
     @apply bg-background text-gray-100 font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
 
   * {
     @apply border-border;
   }
+
+  /* Numeric elements use tabular figures for clean alignment */
+  .tabular, .money, td[data-money], .stat-value {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @layer components {
+  /* ========== CARDS ========== */
   .card {
     @apply bg-surface border border-[#1F2937] rounded-lg shadow-lg;
   }
 
+  .card-gradient {
+    @apply relative overflow-hidden rounded-lg border border-[#1F2937] shadow-lg;
+    background: linear-gradient(135deg, #111827 0%, #0F1725 100%);
+  }
+
+  .card-gradient::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  }
+
+  /* ========== BUTTONS ========== */
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md hover:shadow-blue-500/10;
   }
 
   .btn-secondary {
@@ -31,6 +50,11 @@
     @apply bg-red-600/20 hover:bg-red-600/30 text-red-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors;
   }
 
+  .btn-ghost {
+    @apply text-gray-400 hover:text-white hover:bg-[#1C2333] px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  /* ========== FORMS ========== */
   .input {
     @apply w-full bg-[#1C2333] border border-[#1F2937] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors;
   }
@@ -39,10 +63,18 @@
     @apply block text-xs font-medium text-gray-400 mb-1;
   }
 
+  /* ========== BADGES ========== */
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
+  .badge-success { @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/20; }
+  .badge-warning { @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/20; }
+  .badge-danger  { @apply bg-red-500/15 text-red-400 border border-red-500/20; }
+  .badge-info    { @apply bg-blue-500/15 text-blue-400 border border-blue-500/20; }
+  .badge-muted   { @apply bg-gray-500/15 text-gray-400 border border-gray-500/20; }
+
+  /* ========== TABLES ========== */
   .table-header {
     @apply text-xs font-medium text-gray-400 uppercase tracking-wider px-4 py-3 text-left;
   }
@@ -51,6 +83,7 @@
     @apply px-4 py-3 text-sm text-gray-300;
   }
 
+  /* ========== MODAL ========== */
   .modal-overlay {
     @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
   }
@@ -59,19 +92,108 @@
     @apply bg-surface border border-[#1F2937] rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto;
   }
 
+  /* ========== STAT CARDS ========== */
   .stat-card {
     @apply card p-4 flex flex-col gap-1;
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-white;
+    @apply text-2xl font-bold text-white font-mono;
+    font-variant-numeric: tabular-nums;
   }
 
   .stat-label {
-    @apply text-xs text-gray-400;
+    @apply text-xs text-gray-400 font-medium uppercase tracking-wider;
+  }
+
+  /* Financial KPI card — richer treatment */
+  .kpi-card {
+    @apply relative p-5 rounded-xl border overflow-hidden;
+    background: linear-gradient(135deg, #111827 0%, #0F1725 100%);
+    border-color: #1F2937;
+  }
+
+  .kpi-card::after {
+    content: '';
+    @apply absolute inset-x-0 top-0 h-0.5 opacity-60;
+  }
+
+  .kpi-card-income::after  { background: linear-gradient(90deg, transparent, #10B981, transparent); }
+  .kpi-card-expense::after { background: linear-gradient(90deg, transparent, #EF4444, transparent); }
+  .kpi-card-balance::after { background: linear-gradient(90deg, transparent, #3B82F6, transparent); }
+  .kpi-card-margin::after  { background: linear-gradient(90deg, transparent, #8B5CF6, transparent); }
+  .kpi-card-neutral::after { background: linear-gradient(90deg, transparent, #6B7280, transparent); }
+
+  .kpi-label {
+    @apply text-[11px] font-semibold uppercase tracking-widest text-gray-500;
+  }
+
+  .kpi-value {
+    @apply text-3xl font-bold tracking-tight mt-1 font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-sub {
+    @apply text-xs text-gray-500 mt-1;
+  }
+
+  /* ========== DELTA INDICATORS ========== */
+  .delta-up {
+    @apply inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .delta-down {
+    @apply inline-flex items-center gap-1 text-xs font-semibold text-red-400 font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .delta-flat {
+    @apply inline-flex items-center gap-1 text-xs font-semibold text-gray-500 font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ========== AGING BUCKETS (cuentas por cobrar) ========== */
+  .aging-bucket {
+    @apply flex items-center justify-between p-3 rounded-lg border transition-colors;
+  }
+
+  .aging-current { @apply bg-emerald-500/5 border-emerald-500/20 text-emerald-400; }
+  .aging-30      { @apply bg-yellow-500/5 border-yellow-500/20 text-yellow-400; }
+  .aging-60      { @apply bg-orange-500/5 border-orange-500/20 text-orange-400; }
+  .aging-90      { @apply bg-red-500/5 border-red-500/20 text-red-400; }
+
+  /* ========== MINI SPARKLINE / PROGRESS ========== */
+  .progress-track {
+    @apply w-full h-2 bg-[#1C2333] rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  /* Section header */
+  .section-title {
+    @apply text-sm font-semibold text-gray-300 uppercase tracking-wider;
+  }
+
+  .section-subtitle {
+    @apply text-xs text-gray-500 mt-0.5;
+  }
+
+  /* Divider with label */
+  .divider-label {
+    @apply flex items-center gap-3 text-xs font-semibold text-gray-500 uppercase tracking-widest;
+  }
+
+  .divider-label::before,
+  .divider-label::after {
+    content: '';
+    @apply flex-1 h-px bg-[#1F2937];
   }
 }
 
+/* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -89,3 +211,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #374151;
 }
+
+/* ========== ANIMATIONS ========== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+.animate-fade-in  { animation: fadeIn 0.3s ease-out; }
+.animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
