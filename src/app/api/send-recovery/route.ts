@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,57 +9,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email es requerido' }, { status: 400 });
     }
 
-    const adminSupabase = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
-
-    // First verify the user exists
-    const { data: usersData } = await adminSupabase.auth.admin.listUsers();
-    const userExists = usersData?.users?.some(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!userExists) {
-      // Don't reveal if user exists — still show success
-      return NextResponse.json({ success: true, recoveryLink: null });
-    }
-
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const origin = req.headers.get('origin') || req.nextUrl.origin;
     const redirectTo = `${origin}/auth/callback?next=/reset-password`;
 
-    // generateLink generates a token — may return error about SMTP but data may still have the link
-    const { data, error } = await adminSupabase.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: { redirectTo },
+    // Call Supabase GoTrue admin API directly via REST
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'apikey': serviceRoleKey,
+      },
+      body: JSON.stringify({
+        type: 'recovery',
+        email,
+        redirect_to: redirectTo,
+      }),
     });
 
-    console.log('[send-recovery] generateLink result:', {
-      hasData: !!data,
-      hasLink: !!data?.properties?.action_link,
-      hasError: !!error,
-      errorMsg: error?.message,
+    const data = await response.json();
+    console.log('[send-recovery] GoTrue response status:', response.status);
+    console.log('[send-recovery] GoTrue response keys:', Object.keys(data));
+
+    if (!response.ok) {
+      console.error('[send-recovery] GoTrue error:', data);
+      // If user not found, don't reveal — return generic success
+      if (data?.msg?.includes('User not found') || data?.error?.includes('not found')) {
+        return NextResponse.json({ success: true, recoveryLink: null });
+      }
+      return NextResponse.json({
+        error: data?.msg || data?.error || data?.message || 'Error al generar enlace'
+      }, { status: 400 });
+    }
+
+    // The action_link is in the response even if email sending failed
+    const actionLink = data?.action_link;
+    console.log('[send-recovery] Got action_link:', !!actionLink);
+
+    return NextResponse.json({
+      success: true,
+      recoveryLink: actionLink || null
     });
-
-    // Check if we got the link even if there was an SMTP error
-    const actionLink = data?.properties?.action_link;
-
-    if (actionLink) {
-      return NextResponse.json({ success: true, recoveryLink: actionLink });
-    }
-
-    // If generateLink completely failed, fall back to generating a temp password approach
-    if (error) {
-      console.error('[send-recovery] Full error:', error);
-      return NextResponse.json(
-        { error: `No se pudo generar el enlace: ${error.message}` },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({ success: true, recoveryLink: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[send-recovery] Catch error:', message);
