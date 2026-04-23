@@ -53,15 +53,31 @@ export default function CobrosClient({ clientes, cobros }: Props) {
   }, [clientes]);
 
   const clientesCobros = useMemo<ClienteCobro[]>(() => {
-    return clientes.map((cliente) => {
-      const cobro = cobros.find(
-        (c) => c.cliente_id === cliente.id && c.mes === currentMonth && c.anio === currentYear
-      ) ?? null;
-      // Becados default to exonerado if no cobro registered
-      const defaultEstado: EstadoCobro = (cliente.beca || cliente.estado === 'becado') ? 'exonerado' : 'pendiente';
-      const estado: EstadoCobro = cobro ? cobro.estado : defaultEstado;
-      return { cliente, cobro, estado };
-    });
+    return clientes
+      .filter((cliente) => {
+        // If client has a start date, only show them in months >= their start date
+        if (cliente.fecha_instalacion) {
+          const start = new Date(cliente.fecha_instalacion + 'T00:00:00');
+          const startYear = start.getFullYear();
+          const startMonth = start.getMonth() + 1;
+          if (
+            currentYear < startYear ||
+            (currentYear === startYear && currentMonth < startMonth)
+          ) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .map((cliente) => {
+        const cobro = cobros.find(
+          (c) => c.cliente_id === cliente.id && c.mes === currentMonth && c.anio === currentYear
+        ) ?? null;
+        // Becados default to exonerado if no cobro registered
+        const defaultEstado: EstadoCobro = (cliente.beca || cliente.estado === 'becado') ? 'exonerado' : 'pendiente';
+        const estado: EstadoCobro = cobro ? cobro.estado : defaultEstado;
+        return { cliente, cobro, estado };
+      });
   }, [clientes, cobros, currentMonth, currentYear]);
 
   const filtered = useMemo(() => {
