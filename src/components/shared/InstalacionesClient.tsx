@@ -4,7 +4,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
+import {
+  createInstalacion,
+  updateInstalacion,
+  deleteInstalacion,
+  getErrorMessage,
+  createTareaFromInstalacion,
+  syncTareaPorInstalacion,
+  deleteTareasPorInstalacion,
+} from '@/lib/services';
 import { formatDate, estadoInstalacionColor, prioridadColor, meses } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign } from 'lucide-react';
@@ -233,6 +241,10 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         // Revertido → eliminar entrada
         await eliminarDeLibroDiario(editing.id);
       }
+      // Sincronizar la tarea vinculada cuando cambia el estado de la instalación
+      if (editing.estado !== form.estado) {
+        await syncTareaPorInstalacion(editing.id, form.estado);
+      }
     } else {
       const result = await createInstalacion(payload);
       if (result.error) {
@@ -246,6 +258,30 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         const nombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
         await registrarEnLibroDiario(result.data.id, form.tipo, form.costo, nombre);
       }
+      // Generar tarea automática vinculada a esta instalación
+      if (result.data?.id) {
+        const clienteObj = clientes.find((c) => c.id === form.cliente_id);
+        const clienteNombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
+        // El form guarda el técnico como string (nombre completo). Mapear a su id.
+        const tecnicoMatch = tecnicos.find(
+          (t) => `${t.nombre} ${t.apellido}` === form.tecnico_asignado
+        );
+        const tareaResult = await createTareaFromInstalacion({
+          instalacionId: result.data.id,
+          clienteId: form.cliente_id,
+          clienteNombre,
+          tipoInstalacion: form.tipo,
+          prioridad: form.prioridad,
+          fechaProgramada: form.fecha_programada || null,
+          asignadoA: tecnicoMatch?.id ?? null,
+          creadoPor: profile?.id ?? null,
+          direccion: form.direccion || null,
+        });
+        if (tareaResult.error) {
+          console.warn('[Instalación→Tarea] No se pudo generar tarea:', tareaResult.error);
+          toast.warning('Instalación creada, pero no se generó la tarea automática.');
+        }
+      }
     }
     setShowModal(false);
     router.refresh();
@@ -253,13 +289,14 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar esta instalación?')) return;
+    if (!confirm('¿Eliminar esta instalación? También se eliminará la tarea vinculada.')) return;
     const result = await deleteInstalacion(id);
     if (result.error) {
       toast.error(getErrorMessage(result.error));
       return;
     }
     await eliminarDeLibroDiario(id);
+    await deleteTareasPorInstalacion(id);
     toast.success('Instalación eliminada');
     setInstalaciones((prev) => prev.filter((i) => i.id !== id));
     router.refresh();

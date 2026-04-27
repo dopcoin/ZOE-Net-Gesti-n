@@ -110,6 +110,110 @@ export async function toggleTarea(id: string, completada: boolean): Promise<Serv
   } catch (e) { return { error: handleError(e) }; }
 }
 
+// ==================== INSTALACIONES <-> TAREAS (vinculación) ====================
+// Crea una tarea automática al crear una instalación.
+// La tarea queda vinculada vía referencia_id + referencia_tipo='instalacion'.
+export async function createTareaFromInstalacion(data: {
+  instalacionId: string;
+  clienteId: string;
+  clienteNombre: string;
+  tipoInstalacion: string;
+  prioridad: string;
+  fechaProgramada: string | null;
+  asignadoA: string | null;
+  creadoPor: string | null;
+  direccion?: string | null;
+}): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const desc = data.direccion ? `Dirección: ${data.direccion}` : null;
+    const { error } = await supabase.from('tareas').insert({
+      titulo: `Instalación: ${data.tipoInstalacion} — ${data.clienteNombre}`,
+      descripcion: desc,
+      equipo: 'soporte',
+      tipo_equipo: 'soporte',
+      asignado_a: data.asignadoA,
+      cliente_id: data.clienteId,
+      prioridad: data.prioridad,
+      fecha_limite: data.fechaProgramada,
+      completada: false,
+      estado: 'pendiente',
+      creado_por: data.creadoPor,
+      referencia_id: data.instalacionId,
+      referencia_tipo: 'instalacion',
+    });
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
+// Sincroniza el estado de la tarea vinculada al cambiar el estado de la instalación.
+// - completada: marca tarea como completada
+// - cancelada: elimina tarea vinculada
+// - pendiente | en_progreso: descompleta tarea
+export async function syncTareaPorInstalacion(
+  instalacionId: string,
+  nuevoEstadoInstalacion: 'pendiente' | 'en_progreso' | 'completada' | 'cancelada'
+): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    if (nuevoEstadoInstalacion === 'cancelada') {
+      const { error } = await supabase
+        .from('tareas')
+        .delete()
+        .eq('referencia_id', instalacionId)
+        .eq('referencia_tipo', 'instalacion');
+      if (error) return { error: handleError(error) };
+      return {};
+    }
+    const completada = nuevoEstadoInstalacion === 'completada';
+    const { error } = await supabase
+      .from('tareas')
+      .update({
+        completada,
+        estado: completada ? 'completada' : 'pendiente',
+        completada_en: completada ? new Date().toISOString() : null,
+      })
+      .eq('referencia_id', instalacionId)
+      .eq('referencia_tipo', 'instalacion');
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
+export async function deleteTareasPorInstalacion(instalacionId: string): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('tareas')
+      .delete()
+      .eq('referencia_id', instalacionId)
+      .eq('referencia_tipo', 'instalacion');
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
+// Sincroniza el estado de la instalación al completar/descompletar la tarea vinculada.
+// Solo aplica si la tarea tiene referencia_tipo='instalacion'.
+export async function syncInstalacionPorTarea(
+  instalacionId: string,
+  tareaCompletada: boolean
+): Promise<ServiceResult> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('instalaciones')
+      .update({
+        estado: tareaCompletada ? 'completada' : 'en_progreso',
+        fecha_completada: tareaCompletada ? new Date().toISOString() : null,
+      })
+      .eq('id', instalacionId);
+    if (error) return { error: handleError(error) };
+    return {};
+  } catch (e) { return { error: handleError(e) }; }
+}
+
 // ==================== INVENTARIO / MERCANCIA ====================
 export async function createMercancia(data: Record<string, unknown>): Promise<ServiceResult> {
   try {

@@ -214,6 +214,9 @@ export interface Tarea {
   completada: boolean;
   fecha_limite: string | null;
   created_by: string | null;
+  creado_por: string | null;
+  referencia_id: string | null;
+  referencia_tipo: string | null;
   created_at: string;
   updated_at: string;
   profiles?: Profile;
