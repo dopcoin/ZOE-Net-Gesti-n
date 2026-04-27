@@ -71,11 +71,13 @@ export interface Cobro {
   tipo_pago: TipoCobro | null;
   fecha_pago: string | null;
   recibido_por: string | null;
+  registrado_por: string | null;
   notas: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   clientes?: Cliente;
+  profiles?: { nombre: string; apellido: string } | null;
 }
 
 export interface CategoriaMercancia {
