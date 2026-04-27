@@ -36,3 +36,7 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# handoff bundle — la carpeta de codigo-relevante es regenerable
+/handoff/codigo-relevante/
+ZOENet-proyecto-web-handoff.zip
