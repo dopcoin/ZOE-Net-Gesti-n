@@ -367,23 +367,60 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
       )}
 
       {tab === 'ganancias' && (
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="stat-card">
-            <span className="stat-label">Total Ganancias</span>
-            <span className="stat-value">{statsGanancias.total}</span>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="stat-card">
+              <span className="stat-label">A pagar (cantidad)</span>
+              <span className="stat-value text-yellow-400">{statsGanancias.pendientes}</span>
+              <span className="text-xs text-gray-500 mt-0.5">comisiones sin pagar</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Total a pagar</span>
+              <span className="stat-value text-yellow-400">{formatCurrency(statsGanancias.montoPendiente)}</span>
+              <span className="text-xs text-gray-500 mt-0.5">deuda con revendedores</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Pagado histórico</span>
+              <span className="stat-value text-emerald-400">{formatCurrency(statsGanancias.montoPagado)}</span>
+              <span className="text-xs text-gray-500 mt-0.5">ya saldado</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Total acumulado</span>
+              <span className="stat-value">{statsGanancias.total}</span>
+              <span className="text-xs text-gray-500 mt-0.5">comisiones generadas</span>
+            </div>
           </div>
-          <div className="stat-card">
-            <span className="stat-label">Pendientes</span>
-            <span className="stat-value text-yellow-400">{statsGanancias.pendientes}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Monto Pendiente</span>
-            <span className="stat-value text-yellow-400">{formatCurrency(statsGanancias.montoPendiente)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Monto Pagado</span>
-            <span className="stat-value text-emerald-400">{formatCurrency(statsGanancias.montoPagado)}</span>
-          </div>
+
+          {/* Resumen por revendedor — solo pendientes */}
+          {statsGanancias.pendientes > 0 && (
+            <div className="card p-4">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Pagos pendientes por revendedor</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {Object.entries(
+                  ganancias
+                    .filter((g) => !g.pagado)
+                    .reduce<Record<string, { nombre: string; total: number; count: number }>>((acc, g) => {
+                      const key = g.revendedor_id;
+                      const nombre = g.revendedores ? `${g.revendedores.nombre} ${g.revendedores.apellido}` : 'Desconocido';
+                      if (!acc[key]) acc[key] = { nombre, total: 0, count: 0 };
+                      acc[key].total += g.monto;
+                      acc[key].count += 1;
+                      return acc;
+                    }, {})
+                )
+                  .sort(([, a], [, b]) => b.total - a.total)
+                  .map(([id, { nombre, total, count }]) => (
+                    <div key={id} className="flex items-center justify-between p-2 rounded-lg bg-[#1C2333]">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{nombre}</p>
+                        <p className="text-xs text-gray-500">{count} comisión{count === 1 ? '' : 'es'}</p>
+                      </div>
+                      <span className="text-sm font-bold text-yellow-400 ml-2">{formatCurrency(total)}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -508,40 +545,84 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
                 const name = g.revendedores ? `${g.revendedores.nombre} ${g.revendedores.apellido}` : '';
                 return name.toLowerCase().includes(search.toLowerCase());
               })
-              .map((g) => (
-                <div key={g.id} className="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <DollarSign size={16} className="text-emerald-400 flex-shrink-0" />
-                      <span className="font-medium text-white">
-                        {g.revendedores ? `${g.revendedores.nombre} ${g.revendedores.apellido}` : 'Desconocido'}
-                      </span>
-                      <span className={`badge ${g.tipo === 'auto' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                        {g.tipo === 'auto' ? 'Auto' : 'Manual'}
-                      </span>
+              .map((g) => {
+                const v = g.ventas as (typeof g.ventas & { mercancia?: { nombre: string } | null; clientes?: { nombre: string; apellido: string } | null }) | null | undefined;
+                const r = g.revendedores as (typeof g.revendedores & { tipo_comision?: TipoComision; porcentaje_comision?: number | null; monto_fijo_comision?: number | null }) | null | undefined;
+                // Construir explicación del cálculo
+                let explicacion: string | null = null;
+                if (v && r) {
+                  const totalVenta = v.total ?? 0;
+                  if (r.tipo_comision === 'porcentaje' && r.porcentaje_comision != null) {
+                    explicacion = `${r.porcentaje_comision}% de ${formatCurrency(totalVenta)} = ${formatCurrency(g.monto)}`;
+                  } else if (r.tipo_comision === 'fijo') {
+                    explicacion = `Comisión fija por venta`;
+                  } else if (r.tipo_comision === 'mixto' && r.porcentaje_comision != null) {
+                    explicacion = `${r.porcentaje_comision}% de ${formatCurrency(totalVenta)} + fijo = ${formatCurrency(g.monto)}`;
+                  }
+                }
+                return (
+                  <div key={g.id} className={`card p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${g.pagado ? 'opacity-70' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <DollarSign size={16} className="text-emerald-400 flex-shrink-0" />
+                        <span className="font-medium text-white">
+                          {g.revendedores ? `${g.revendedores.nombre} ${g.revendedores.apellido}` : 'Desconocido'}
+                        </span>
+                        <span className={`badge text-xs ${g.tipo === 'auto' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                          {g.tipo === 'auto' ? 'Auto (por venta)' : 'Manual'}
+                        </span>
+                        <span className="text-base font-bold text-yellow-400">
+                          {formatCurrency(g.monto)}
+                        </span>
+                      </div>
+
+                      {/* De qué venta viene */}
+                      {v && (
+                        <div className="text-xs text-gray-400 mb-1">
+                          <span className="text-gray-500">Por venta de </span>
+                          <span className="text-gray-300 font-medium">{v.mercancia?.nombre ?? 'producto'}</span>
+                          {v.clientes && (
+                            <>
+                              <span className="text-gray-500"> a </span>
+                              <span className="text-gray-300">{v.clientes.nombre} {v.clientes.apellido}</span>
+                            </>
+                          )}
+                          <span className="text-gray-500"> · {formatDate(v.created_at)}</span>
+                        </div>
+                      )}
+
+                      {/* Explicación del cálculo */}
+                      {explicacion && (
+                        <div className="text-xs text-blue-400/80 mb-1">
+                          <span className="font-mono">{explicacion}</span>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                        <span>Generada: {formatDate(g.created_at)}</span>
+                        {g.pagado && g.fecha_pago && (
+                          <span className="text-emerald-400">· Pagada: {formatDate(g.fecha_pago)}</span>
+                        )}
+                        {g.notas && <span>· {g.notas}</span>}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-400 flex items-center gap-3">
-                      <span>Monto: <span className="text-white font-medium">{formatCurrency(g.monto)}</span></span>
-                      <span>{formatDate(g.created_at)}</span>
-                      {g.notas && <span className="truncate max-w-xs">- {g.notas}</span>}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {g.pagado ? (
+                        <span className="badge bg-emerald-500/20 text-emerald-400">
+                          <Check size={12} className="mr-1" /> Pagado
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleMarcarPagado(g)}
+                          className="btn-primary text-xs flex items-center gap-1"
+                        >
+                          <Check size={14} /> Marcar pagado
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {g.pagado ? (
-                      <span className="badge bg-emerald-500/20 text-emerald-400">
-                        <Check size={12} className="mr-1" /> Pagado
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleMarcarPagado(g)}
-                        className="btn-primary text-xs flex items-center gap-1"
-                      >
-                        <Check size={14} /> Marcar pagado
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
           )}
         </div>
       )}

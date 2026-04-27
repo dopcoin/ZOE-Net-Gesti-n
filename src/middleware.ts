@@ -28,7 +28,11 @@ export async function middleware(request: NextRequest) {
   const publicPages = ['/login', '/reset-password', '/registro'];
   const isAuthPage = publicPages.includes(request.nextUrl.pathname);
   const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback');
-  const isProtectedRoute = !isAuthPage && !isAuthCallback && request.nextUrl.pathname !== '/';
+  // Vista pública de facturas: /factura/{uuid}/view — el cliente abre desde
+  // un link compartido por WhatsApp/email. El UUID actúa como token.
+  const isFacturaPublica = /^\/factura\/[0-9a-f-]{36}\/view\/?$/i.test(request.nextUrl.pathname);
+  const isProtectedRoute =
+    !isAuthPage && !isAuthCallback && !isFacturaPublica && request.nextUrl.pathname !== '/';
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();

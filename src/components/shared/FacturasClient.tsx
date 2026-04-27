@@ -21,6 +21,10 @@ import {
   Trash2,
   PlusCircle,
   Search,
+  Eye,
+  Download,
+  Link as LinkIcon,
+  MessageCircle,
 } from 'lucide-react';
 
 interface ClienteOption {
@@ -33,7 +37,7 @@ interface ClienteOption {
 }
 
 interface Props {
-  facturas: (Factura & { clientes?: { nombre: string; apellido: string } })[];
+  facturas: (Factura & { clientes?: { nombre: string; apellido: string; telefono?: string | null } })[];
   clientes: ClienteOption[];
 }
 
@@ -212,6 +216,47 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       console.error('[LibroDiario] Error factura:', error);
       toast.warning(`Factura guardada. Error en Libro Diario: ${error.message}`);
     }
+  };
+
+  // ---------- Compartir factura ----------
+  const linkPublico = (id: string): string => {
+    if (typeof window === 'undefined') return `/factura/${id}/view`;
+    return `${window.location.origin}/factura/${id}/view`;
+  };
+
+  const copiarLinkPublico = async (id: string) => {
+    const url = linkPublico(id);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copiado al portapapeles');
+    } catch {
+      // Fallback: prompt para copia manual
+      window.prompt('Copia el link:', url);
+    }
+  };
+
+  // Limpia un teléfono dominicano para wa.me: solo dígitos, prepend 1 si no
+  // está (RD = +1 país). 'wa.me/18095551234'.
+  function telefonoWhatsApp(tel: string | null | undefined): string | null {
+    if (!tel) return null;
+    const digits = tel.replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.startsWith('1') && digits.length === 11) return digits;
+    if (digits.length === 10) return `1${digits}`;
+    return digits; // por si ya viene con código país no-RD
+  }
+
+  const enviarPorWhatsApp = (factura: Factura & { clientes?: { nombre: string; apellido: string; telefono?: string | null } }) => {
+    const url = linkPublico(factura.id);
+    const cliente = factura.clientes;
+    const saludo = cliente ? `Hola ${cliente.nombre},` : 'Hola,';
+    const texto = `${saludo}\n\nTe comparto tu factura ${factura.numero} de ZoeNet:\n${url}\n\nGracias por tu preferencia.`;
+    const tel = telefonoWhatsApp(cliente?.telefono);
+    // Si hay teléfono, abrimos el chat directo; si no, dejamos que WhatsApp pida destinatario
+    const waUrl = tel
+      ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}`
+      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
   // ---------- Save ----------
@@ -473,6 +518,38 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
                           title="Editar"
                         >
                           <FileText className="h-4 w-4" />
+                        </button>
+                        <a
+                          href={`/factura/${f.id}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                          title="Ver factura (vista pública)"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </a>
+                        <a
+                          href={`/api/facturas/${f.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          title="Descargar PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                        <button
+                          onClick={() => copiarLinkPublico(f.id)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+                          title="Copiar link público"
+                        >
+                          <LinkIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => enviarPorWhatsApp(f)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                          title={f.clientes?.telefono ? `WhatsApp a ${f.clientes.telefono}` : 'WhatsApp (cliente sin teléfono — abre selector)'}
+                        >
+                          <MessageCircle className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(f)}

@@ -237,10 +237,54 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
 
   // --- CRUD ---
   const handleSave = async () => {
-    if (!formData.nombre.trim()) {
+    // Trim antes de validar para no aceptar nombres con solo espacios
+    const nombre = formData.nombre.trim();
+    const apellido = (formData.apellido || '').trim();
+
+    if (!nombre) {
       toast.error('El nombre es obligatorio');
+      setActiveTab('general');
       return;
     }
+
+    // Validaciones específicas para empresa
+    if (formData.tipo_cliente === 'empresa') {
+      const rnc = (formData.rnc || '').replace(/\D/g, '');
+      const razonSocial = (formData.razon_social || '').trim();
+      if (!razonSocial) {
+        toast.error('La razón social es obligatoria para clientes empresa');
+        setActiveTab('general');
+        return;
+      }
+      if (!rnc) {
+        toast.error('El RNC es obligatorio para clientes empresa');
+        setActiveTab('general');
+        return;
+      }
+      if (rnc.length !== 9 && rnc.length !== 11) {
+        toast.error('El RNC debe tener 9 u 11 dígitos');
+        setActiveTab('general');
+        return;
+      }
+      // Persistir el RNC ya normalizado (solo dígitos)
+      formData.rnc = rnc;
+      formData.razon_social = razonSocial;
+    }
+
+    // Si vino una cédula, normalizar formato (solo dígitos)
+    if (formData.cedula) {
+      const cedulaDigits = formData.cedula.replace(/\D/g, '');
+      if (cedulaDigits && cedulaDigits.length !== 11) {
+        const ok = window.confirm(
+          `La cédula tiene ${cedulaDigits.length} dígitos (esperado 11). ¿Guardar de todos modos?`
+        );
+        if (!ok) return;
+      }
+    }
+
+    // Reflejar trims en el state antes de submit
+    formData.nombre = nombre;
+    formData.apellido = apellido;
 
     setLoading(true);
     try {
@@ -249,20 +293,29 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       if (modalMode === 'create') {
         const result = await createCliente(payload);
         if (result.error) {
-          toast.error(getErrorMessage(result.error));
+          // Mostrar mensaje específico del backend para que el user sepa qué falló
+          const msg = getErrorMessage(result.error);
+          console.error('[clientes:create]', result.error);
+          toast.error(`No se pudo crear el cliente: ${msg}`);
           return;
         }
-        toast.success('Cliente creado exitosamente');
+        toast.success(`Cliente "${nombre} ${apellido}" creado`);
       } else if (selectedCliente) {
         const result = await updateCliente(selectedCliente.id, payload);
         if (result.error) {
-          toast.error(getErrorMessage(result.error));
+          const msg = getErrorMessage(result.error);
+          console.error('[clientes:update]', result.error);
+          toast.error(`No se pudo actualizar el cliente: ${msg}`);
           return;
         }
-        toast.success('Cliente actualizado exitosamente');
+        toast.success(`Cliente "${nombre} ${apellido}" actualizado`);
       }
       closeModal();
       router.refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[clientes:save] Error inesperado:', e);
+      toast.error(`Error inesperado: ${msg}`);
     } finally {
       setLoading(false);
     }
