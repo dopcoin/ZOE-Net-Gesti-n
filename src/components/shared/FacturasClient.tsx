@@ -12,6 +12,7 @@ import {
   getErrorMessage,
 } from '@/lib/services';
 import { formatCurrency, formatDate, estadoFacturaColor } from '@/lib/utils';
+import { TIPOS_COMPROBANTE, NCF_REGEX, tipoComprobanteRecomendado } from '@/lib/empresa';
 import { toast } from 'sonner';
 import {
   Plus,
@@ -26,6 +27,9 @@ interface ClienteOption {
   id: string;
   nombre: string;
   apellido: string;
+  tipo_cliente?: 'persona' | 'empresa';
+  rnc?: string | null;
+  razon_social?: string | null;
 }
 
 interface Props {
@@ -50,6 +54,8 @@ const emptyForm = {
   itbis: 18,
   estado: 'emitida' as EstadoFactura,
   notas: '',
+  tipo_comprobante: 'B02' as string,
+  ncf: '' as string,
 };
 
 export default function FacturasClient({ facturas: initial, clientes }: Props) {
@@ -153,6 +159,8 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       itbis: factura.itbis ?? 18,
       estado: factura.estado,
       notas: factura.notas ?? '',
+      tipo_comprobante: factura.tipo_comprobante ?? 'B02',
+      ncf: factura.ncf ?? '',
     });
     setModalMode('edit');
     setModalOpen(true);
@@ -213,6 +221,22 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
       return;
     }
 
+    // Validar formato NCF si se ingresó. El constraint de DB también lo valida,
+    // pero damos feedback temprano al usuario.
+    const ncfTrimmed = formData.ncf.trim();
+    if (ncfTrimmed && !NCF_REGEX.test(ncfTrimmed)) {
+      toast.error('NCF inválido. Formato: B01 + 8 a 10 dígitos (ej: B0100000123)');
+      return;
+    }
+
+    // Si es B01 sin NCF, advertir (es para crédito fiscal — debe llevar NCF para deducción)
+    if (formData.tipo_comprobante === 'B01' && !ncfTrimmed) {
+      const ok = window.confirm(
+        'Una factura B01 (Crédito Fiscal) sin NCF no permite al cliente empresarial deducir el ITBIS. ¿Guardar de todos modos?'
+      );
+      if (!ok) return;
+    }
+
     setLoading(true);
     try {
       const items = formData.items.map((item) => ({
@@ -234,6 +258,8 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
         itbis: formData.itbis,
         estado: formData.estado,
         notas: formData.notas || null,
+        tipo_comprobante: formData.tipo_comprobante,
+        ncf: ncfTrimmed || null,
         // Columnas legacy que controlan el total generado: precio_unitario * cantidad
         descripcion: items[0]?.descripcion ?? 'Ver items adjuntos',
         cantidad: 1,
@@ -369,6 +395,7 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
             <thead>
               <tr className="border-b border-[#1F2937]">
                 <th className="table-header">Numero</th>
+                <th className="table-header">NCF / Tipo</th>
                 <th className="table-header">Cliente</th>
                 <th className="table-header">Subtotal</th>
                 <th className="table-header">Descuento</th>
@@ -382,7 +409,7 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="table-cell text-center text-gray-500 py-12">
+                  <td colSpan={10} className="table-cell text-center text-gray-500 py-12">
                     {search ? 'Sin resultados para la busqueda' : 'No hay facturas registradas'}
                   </td>
                 </tr>
@@ -393,6 +420,18 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
                     className="border-b border-[#1F2937] hover:bg-[#1C2333]/50 transition-colors"
                   >
                     <td className="table-cell font-medium text-gray-100">{f.numero}</td>
+                    <td className="table-cell">
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`badge text-xs w-fit ${
+                          f.tipo_comprobante === 'B01' || f.tipo_comprobante === 'E31'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {f.tipo_comprobante ?? 'B02'}
+                        </span>
+                        {f.ncf && <span className="text-xs font-mono text-gray-400">{f.ncf}</span>}
+                      </div>
+                    </td>
                     <td className="table-cell text-gray-300">
                       {f.clientes
                         ? `${f.clientes.nombre} ${f.clientes.apellido}`
@@ -493,18 +532,80 @@ export default function FacturasClient({ facturas: initial, clientes }: Props) {
                   <label className="label">Cliente</label>
                   <select
                     value={formData.cliente_id}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, cliente_id: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      const newClienteId = e.target.value;
+                      const cliente = clientes.find((c) => c.id === newClienteId);
+                      // Auto-recomendar tipo de comprobante según el tipo de cliente
+                      // (B01 si empresa con RNC, B02 si persona). Solo aplica al
+                      // crear factura nueva — al editar respetamos el valor existente.
+                      setFormData((prev) => {
+                        const next = { ...prev, cliente_id: newClienteId };
+                        if (modalMode === 'create' && cliente?.tipo_cliente) {
+                          next.tipo_comprobante = tipoComprobanteRecomendado(cliente.tipo_cliente);
+                        }
+                        return next;
+                      });
+                    }}
                     className="input w-full"
                   >
                     <option value="">Sin cliente</option>
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.nombre} {c.apellido}
+                        {c.tipo_cliente === 'empresa' && c.razon_social
+                          ? `${c.razon_social} (${c.rnc ?? 'sin RNC'})`
+                          : `${c.nombre} ${c.apellido}`}
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const c = clientes.find((x) => x.id === formData.cliente_id);
+                    if (c?.tipo_cliente === 'empresa') {
+                      return (
+                        <p className="mt-1 text-xs text-blue-400">
+                          Empresa{c.rnc ? ` · RNC ${c.rnc}` : ' · sin RNC'}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
+
+              {/* Comprobante fiscal (NCF) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-lg border border-[#1F2937] bg-[#0F1117]">
+                <div>
+                  <label className="label">Tipo de comprobante</label>
+                  <select
+                    value={formData.tipo_comprobante}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, tipo_comprobante: e.target.value }))}
+                    className="input w-full"
+                  >
+                    {TIPOS_COMPROBANTE.map((t) => (
+                      <option key={t.codigo} value={t.codigo}>{t.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {TIPOS_COMPROBANTE.find((t) => t.codigo === formData.tipo_comprobante)?.descripcion || ''}
+                  </p>
+                </div>
+                <div>
+                  <label className="label">
+                    NCF
+                    {(formData.tipo_comprobante === 'B01' || formData.tipo_comprobante === 'E31') && (
+                      <span className="text-amber-400 ml-1">(requerido para deducción ITBIS)</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.ncf}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, ncf: e.target.value.toUpperCase() }))}
+                    className="input w-full font-mono"
+                    placeholder="B0100000123"
+                    maxLength={13}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Formato: B/E + 2 dígitos tipo + 8 a 10 dígitos secuencia.
+                  </p>
                 </div>
               </div>
 

@@ -36,6 +36,8 @@ export interface Profile {
   updated_at: string;
 }
 
+export type TipoCliente = 'persona' | 'empresa';
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -57,6 +59,9 @@ export interface Cliente {
   ip_asignada: string | null;
   ubicacion_gps: string | null;
   notas: string | null;
+  tipo_cliente: TipoCliente;
+  rnc: string | null;
+  razon_social: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,6 +183,12 @@ export interface Factura {
   itbis: number;
   total: number;
   estado: EstadoFactura;
+  tipo_comprobante: string;
+  ncf: string | null;
+  rnc_emisor: string;
+  razon_social_emisor: string;
+  direccion_emisor: string;
+  telefono_emisor: string;
   notas: string | null;
   created_by: string | null;
   created_at: string;
