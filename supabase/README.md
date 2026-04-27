@@ -27,13 +27,14 @@ curl -sS -X POST "https://api.supabase.com/v1/projects/bsiouklwhnxflorsrphz/data
 | Archivo | Descripción | Estado |
 |---|---|---|
 | `0001_factura_instalacion.sql` | Vincular facturas con instalaciones (`facturas.instalacion_id`) | ✅ Aplicada 2026-04-27 |
+| `0002_factura_ncf.sql` | NCF/DGII: `clientes.tipo_cliente/rnc/razon_social`; `facturas.tipo_comprobante/ncf/rnc_emisor/razon_social_emisor/direccion_emisor/telefono_emisor` | ✅ Aplicada 2026-04-27 |
 
 ## Reglas
 
 - **Nunca editar** una migración ya aplicada en prod. Si algo cambia, crear
   una nueva migración (`0002_…`).
-- Toda migración debe ser **idempotente** (`IF NOT EXISTS`, `IF EXISTS`) para
-  poder re-correrla sin romper.
+- Toda migración debe ser **idempotente** (`IF NOT EXISTS`, `IF EXISTS`,
+  `DO $$ IF NOT EXISTS … $$`) para poder re-correrla sin romper.
 - Envolver cambios complejos en `BEGIN; … COMMIT;`.
 - Si la migración modifica RLS, validar después con un `SELECT` desde el rol
   afectado.
