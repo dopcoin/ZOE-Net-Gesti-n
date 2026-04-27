@@ -2,6 +2,8 @@
 
 > **⚠ IMPORTANTE**: Este archivo solo lista QUÉ credenciales se necesitan y DÓNDE obtenerlas. **Nunca pegues valores reales aquí**. Los valores reales viven en `.env.local` (no committeado, en `.gitignore`) y en Vercel Environment Variables.
 
+> **📨 Para saber CÓMO transmitir secretos de forma segura, ver [`COMPARTIR-CREDENCIALES.md`](./COMPARTIR-CREDENCIALES.md).**
+
 ---
 
 ## 1. Supabase (REQUERIDO)

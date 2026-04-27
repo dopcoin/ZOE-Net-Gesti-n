@@ -11,6 +11,7 @@ handoff/
 ├── README.md                  ← Este archivo (instrucciones)
 ├── HANDOFF.md                 ← Documento principal: estado, arquitectura, pendientes
 ├── CREDENCIALES.md            ← Lista de credenciales necesarias (sin valores reales)
+├── COMPARTIR-CREDENCIALES.md  ← Cómo transmitir secretos de forma segura
 └── codigo-relevante/
     ├── CHANGELOG.md           ← Histórico de versiones
     ├── env.example            ← Plantilla de variables de entorno
