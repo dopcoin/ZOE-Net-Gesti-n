@@ -8,19 +8,25 @@ con prefijo numérico (`0001_`, `0002_`, …).
 
 ## Cómo aplicar una migración
 
-Hasta que instalemos el `supabase` CLI en CI, se aplican manualmente:
+**Vía Management API (preferido)** — requiere `SUPABASE_ACCESS_TOKEN` en
+`.env.local`:
 
-1. Abrir el SQL Editor del proyecto:
-   <https://supabase.com/dashboard/project/bsiouklwhnxflorsrphz/sql/new>
-2. Pegar el contenido del archivo `.sql` correspondiente.
-3. Ejecutar.
-4. Marcar el archivo como aplicado en `_applied.md` con la fecha.
+```bash
+curl -sS -X POST "https://api.supabase.com/v1/projects/bsiouklwhnxflorsrphz/database/query" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$(python3 -c "import json,sys; print(json.dumps({'query': sys.stdin.read()}))" \
+       < supabase/migrations/0001_factura_instalacion.sql)"
+```
 
-## Migraciones pendientes
+**Alternativa manual** — Dashboard → SQL Editor:
+<https://supabase.com/dashboard/project/bsiouklwhnxflorsrphz/sql/new>
 
-| Archivo | Descripción | Aplicada |
+## Estado de migraciones
+
+| Archivo | Descripción | Estado |
 |---|---|---|
-| `0001_factura_instalacion.sql` | Vincular facturas con instalaciones (`facturas.instalacion_id`) | ❌ |
+| `0001_factura_instalacion.sql` | Vincular facturas con instalaciones (`facturas.instalacion_id`) | ✅ Aplicada 2026-04-27 |
 
 ## Reglas
 
