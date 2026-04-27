@@ -13,6 +13,7 @@ interface Props {
   clientes: Cliente[];
   cobros: Cobro[];
   recibidosPor: string[];
+  localidades: string[];
 }
 
 interface ClienteCobro {
@@ -26,7 +27,7 @@ interface ModalData {
   cobro: Cobro | null;
 }
 
-export default function CobrosClient({ clientes, cobros, recibidosPor: initialRecibidosPor }: Props) {
+export default function CobrosClient({ clientes, cobros, recibidosPor: initialRecibidosPor, localidades: serverLocalidades }: Props) {
   const router = useRouter();
   const { profile } = useAuthStore();
   const now = new Date();
@@ -54,10 +55,12 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
   const [historialCobros, setHistorialCobros] = useState<Cobro[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
 
+  // Unión de localidades del servidor (todos los clientes) + las de los clientes
+  // cargados en este mes — así nunca falta una zona recién creada.
   const localidades = useMemo(() => {
     const locs = clientes.map((c) => c.localidad).filter((l): l is string => !!l);
-    return Array.from(new Set(locs)).sort();
-  }, [clientes]);
+    return Array.from(new Set([...serverLocalidades, ...locs])).sort();
+  }, [clientes, serverLocalidades]);
 
   const allRecibidosPor = useMemo(() => {
     return Array.from(new Set([...initialRecibidosPor, ...localRecibidosPor])).sort();
@@ -298,7 +301,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     const supabase = createClient();
     const { data } = await supabase
       .from('cobros')
-      .select('*')
+      .select('*, profiles!cobros_registrado_por_fkey(nombre, apellido)')
       .eq('cliente_id', cliente.id)
       .order('anio', { ascending: false })
       .order('mes', { ascending: false })
@@ -670,9 +673,18 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                 <X size={20} />
               </button>
             </div>
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm text-gray-400 mb-1">
               {meses[currentMonth - 1]} {currentYear} &middot; Plan: {modalData.cliente.plan ?? 'N/A'} &middot; Mensualidad: {formatCurrency(modalData.cliente.monto_mensual)}
             </p>
+            {modalData.cobro?.profiles && (
+              <p className="text-xs text-gray-500 mb-4">
+                Registrado por: <span className="text-gray-300">{modalData.cobro.profiles.nombre} {modalData.cobro.profiles.apellido}</span>
+                {modalData.cobro.fecha_pago && (
+                  <span className="ml-2">· {new Date(modalData.cobro.fecha_pago).toLocaleString('es-DO')}</span>
+                )}
+              </p>
+            )}
+            {!modalData.cobro?.profiles && <div className="mb-4" />}
             <form onSubmit={handleModalSubmit} className="space-y-4">
               {/* Estado */}
               <div>
@@ -858,16 +870,22 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
               <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                 {historialCobros.map((c) => (
                   <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-[#1C2333]">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-white">
                         {meses[(c.mes ?? 1) - 1]} {c.anio}
                       </span>
                       {c.tipo_pago && (
                         <span className="ml-2 text-xs text-gray-500 capitalize">{c.tipo_pago}</span>
                       )}
+                      {c.profiles && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Registrado por <span className="text-gray-400">{c.profiles.nombre} {c.profiles.apellido}</span>
+                          {c.fecha_pago && <span className="ml-1.5">· {new Date(c.fecha_pago).toLocaleDateString('es-DO')}</span>}
+                        </p>
+                      )}
                       {c.notas && <p className="text-xs text-gray-500 mt-0.5">{c.notas}</p>}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0 ml-3">
                       <div className="text-sm font-medium text-white">{formatCurrency(c.monto)}</div>
                       <span className={`badge text-xs ${estadoCobroColor(c.estado)}`}>{c.estado}</span>
                     </div>

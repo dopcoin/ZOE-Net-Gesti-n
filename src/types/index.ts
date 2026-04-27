@@ -36,6 +36,8 @@ export interface Profile {
   updated_at: string;
 }
 
+export type TipoCliente = 'persona' | 'empresa';
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -57,6 +59,9 @@ export interface Cliente {
   ip_asignada: string | null;
   ubicacion_gps: string | null;
   notas: string | null;
+  tipo_cliente: TipoCliente;
+  rnc: string | null;
+  razon_social: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -71,11 +76,13 @@ export interface Cobro {
   tipo_pago: TipoCobro | null;
   fecha_pago: string | null;
   recibido_por: string | null;
+  registrado_por: string | null;
   notas: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   clientes?: Cliente;
+  profiles?: { nombre: string; apellido: string } | null;
 }
 
 export interface CategoriaMercancia {
@@ -178,6 +185,12 @@ export interface Factura {
   itbis: number;
   total: number;
   estado: EstadoFactura;
+  tipo_comprobante: string;
+  ncf: string | null;
+  rnc_emisor: string;
+  razon_social_emisor: string;
+  direccion_emisor: string;
+  telefono_emisor: string;
   notas: string | null;
   created_by: string | null;
   created_at: string;
@@ -212,6 +225,9 @@ export interface Tarea {
   completada: boolean;
   fecha_limite: string | null;
   created_by: string | null;
+  creado_por: string | null;
+  referencia_id: string | null;
+  referencia_tipo: string | null;
   created_at: string;
   updated_at: string;
   profiles?: Profile;

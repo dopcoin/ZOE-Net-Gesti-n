@@ -39,6 +39,9 @@ const emptyForm = {
   tecnico_asignado: null as string | null,
   contrato_numero: null as string | null,
   dias_gracia: null as number | null,
+  tipo_cliente: 'persona' as 'persona' | 'empresa',
+  rnc: null as string | null,
+  razon_social: null as string | null,
 };
 
 type FormData = typeof emptyForm;
@@ -160,6 +163,9 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       tecnico_asignado: (cliente as unknown as Record<string, unknown>).tecnico_asignado as string | null ?? null,
       contrato_numero: (cliente as unknown as Record<string, unknown>).contrato_numero as string | null ?? null,
       dias_gracia: (cliente as unknown as Record<string, unknown>).dias_gracia as number | null ?? null,
+      tipo_cliente: cliente.tipo_cliente ?? 'persona',
+      rnc: cliente.rnc ?? null,
+      razon_social: cliente.razon_social ?? null,
     });
     setModalMode('edit');
     setActiveTab('general');
@@ -205,6 +211,9 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       notas: formData.notas,
       tipo_pago: formData.tipo_pago,
       contrato_numero: formData.contrato_numero,
+      tipo_cliente: formData.tipo_cliente,
+      rnc: formData.tipo_cliente === 'empresa' ? formData.rnc : null,
+      razon_social: formData.tipo_cliente === 'empresa' ? formData.razon_social : null,
     };
     // Clean: remove null/undefined values except required fields
     const payload: Record<string, unknown> = {};
@@ -219,15 +228,63 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
     payload.estado = raw.estado;
     payload.monto_mensual = raw.monto_mensual;
     payload.beca = formData.beca; // boolean — must always be included even if false
+    payload.tipo_cliente = formData.tipo_cliente;
+    // RNC y razón social: explícito incluso cuando son null (al cambiar de empresa→persona se limpian)
+    payload.rnc = formData.tipo_cliente === 'empresa' ? (formData.rnc || null) : null;
+    payload.razon_social = formData.tipo_cliente === 'empresa' ? (formData.razon_social || null) : null;
     return payload;
   };
 
   // --- CRUD ---
   const handleSave = async () => {
-    if (!formData.nombre.trim()) {
+    // Trim antes de validar para no aceptar nombres con solo espacios
+    const nombre = formData.nombre.trim();
+    const apellido = (formData.apellido || '').trim();
+
+    if (!nombre) {
       toast.error('El nombre es obligatorio');
+      setActiveTab('general');
       return;
     }
+
+    // Validaciones específicas para empresa
+    if (formData.tipo_cliente === 'empresa') {
+      const rnc = (formData.rnc || '').replace(/\D/g, '');
+      const razonSocial = (formData.razon_social || '').trim();
+      if (!razonSocial) {
+        toast.error('La razón social es obligatoria para clientes empresa');
+        setActiveTab('general');
+        return;
+      }
+      if (!rnc) {
+        toast.error('El RNC es obligatorio para clientes empresa');
+        setActiveTab('general');
+        return;
+      }
+      if (rnc.length !== 9 && rnc.length !== 11) {
+        toast.error('El RNC debe tener 9 u 11 dígitos');
+        setActiveTab('general');
+        return;
+      }
+      // Persistir el RNC ya normalizado (solo dígitos)
+      formData.rnc = rnc;
+      formData.razon_social = razonSocial;
+    }
+
+    // Si vino una cédula, normalizar formato (solo dígitos)
+    if (formData.cedula) {
+      const cedulaDigits = formData.cedula.replace(/\D/g, '');
+      if (cedulaDigits && cedulaDigits.length !== 11) {
+        const ok = window.confirm(
+          `La cédula tiene ${cedulaDigits.length} dígitos (esperado 11). ¿Guardar de todos modos?`
+        );
+        if (!ok) return;
+      }
+    }
+
+    // Reflejar trims en el state antes de submit
+    formData.nombre = nombre;
+    formData.apellido = apellido;
 
     setLoading(true);
     try {
@@ -236,20 +293,29 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       if (modalMode === 'create') {
         const result = await createCliente(payload);
         if (result.error) {
-          toast.error(getErrorMessage(result.error));
+          // Mostrar mensaje específico del backend para que el user sepa qué falló
+          const msg = getErrorMessage(result.error);
+          console.error('[clientes:create]', result.error);
+          toast.error(`No se pudo crear el cliente: ${msg}`);
           return;
         }
-        toast.success('Cliente creado exitosamente');
+        toast.success(`Cliente "${nombre} ${apellido}" creado`);
       } else if (selectedCliente) {
         const result = await updateCliente(selectedCliente.id, payload);
         if (result.error) {
-          toast.error(getErrorMessage(result.error));
+          const msg = getErrorMessage(result.error);
+          console.error('[clientes:update]', result.error);
+          toast.error(`No se pudo actualizar el cliente: ${msg}`);
           return;
         }
-        toast.success('Cliente actualizado exitosamente');
+        toast.success(`Cliente "${nombre} ${apellido}" actualizado`);
       }
       closeModal();
       router.refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[clientes:save] Error inesperado:', e);
+      toast.error(`Error inesperado: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -444,8 +510,64 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
             {/* Tab: General */}
             {activeTab === 'general' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tipo de cliente: persona / empresa */}
+                <div className="md:col-span-2">
+                  <label className="label">Tipo de cliente</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, tipo_cliente: 'persona', rnc: null, razon_social: null }))}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        formData.tipo_cliente === 'persona'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-[#1C2333] text-gray-400 hover:bg-[#2A3142]'
+                      }`}
+                    >
+                      Persona física
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, tipo_cliente: 'empresa' }))}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        formData.tipo_cliente === 'empresa'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-[#1C2333] text-gray-400 hover:bg-[#2A3142]'
+                      }`}
+                    >
+                      Empresa
+                    </button>
+                  </div>
+                </div>
+
+                {/* Campos solo para empresa */}
+                {formData.tipo_cliente === 'empresa' && (
+                  <>
+                    <div>
+                      <label className="label">RNC *</label>
+                      <input
+                        name="rnc"
+                        value={formData.rnc ?? ''}
+                        onChange={handleChange}
+                        className="input w-full"
+                        placeholder="Ej: 131718264"
+                        maxLength={11}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Razón social *</label>
+                      <input
+                        name="razon_social"
+                        value={formData.razon_social ?? ''}
+                        onChange={handleChange}
+                        className="input w-full"
+                        placeholder="Nombre fiscal de la empresa"
+                      />
+                    </div>
+                  </>
+                )}
+
                 <div>
-                  <label className="label">Nombre *</label>
+                  <label className="label">{formData.tipo_cliente === 'empresa' ? 'Nombre del contacto *' : 'Nombre *'}</label>
                   <input
                     name="nombre"
                     value={formData.nombre}

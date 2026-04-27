@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { createTarea, updateTarea, deleteTarea, toggleTarea, getErrorMessage } from '@/lib/services';
+import { createTarea, updateTarea, deleteTarea, toggleTarea, getErrorMessage, syncInstalacionPorTarea } from '@/lib/services';
 import { formatDate, prioridadColor } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, X, CheckSquare, Square, AlertTriangle, ChevronDown, ChevronRight, History } from 'lucide-react';
@@ -197,15 +197,30 @@ export default function TareasClient({ tareas: initial, miembros, clientes, user
     const result = await toggleTarea(tarea.id, newValue);
     if (result.error) {
       toast.error(getErrorMessage(result.error));
-    } else {
-      setTareas((prev) =>
-        prev.map((t) => (t.id === tarea.id ? { ...t, completada: newValue } : t))
-      );
-      if (newValue) {
-        toast.success('Tarea completada — movida a Tareas Pasadas');
+      return;
+    }
+    setTareas((prev) =>
+      prev.map((t) => (t.id === tarea.id ? { ...t, completada: newValue } : t))
+    );
+    // Si la tarea está vinculada a una instalación, sincronizar el estado.
+    if (tarea.referencia_tipo === 'instalacion' && tarea.referencia_id) {
+      const sync = await syncInstalacionPorTarea(tarea.referencia_id, newValue);
+      if (sync.error) {
+        console.warn('[Tarea→Instalación] No se pudo sincronizar:', sync.error);
+      } else if (newValue) {
+        toast.success('Tarea completada — instalación marcada como completada');
+        router.refresh();
+        return;
       } else {
-        toast.success('Tarea restaurada a pendiente');
+        toast.success('Tarea restaurada — instalación vuelta a en progreso');
+        router.refresh();
+        return;
       }
+    }
+    if (newValue) {
+      toast.success('Tarea completada — movida a Tareas Pasadas');
+    } else {
+      toast.success('Tarea restaurada a pendiente');
     }
   }
 
