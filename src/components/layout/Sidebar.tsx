@@ -9,7 +9,7 @@ import { APP_VERSION } from '@/lib/version';
 import {
   LayoutDashboard, Users, CreditCard, Package, Repeat2,
   Wrench, ShoppingCart, ClipboardCheck, FileText, BookOpen,
-  CheckSquare, UserCog, BarChart3, PiggyBank,
+  CheckSquare, UserCog, BarChart3, PiggyBank, Receipt,
   ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -61,7 +61,8 @@ const navGroups: NavGroup[] = [
     id: 'inventario',
     label: 'Inventario',
     items: [
-      { href: '/inventario', label: 'Inventario', icon: Package, roles: ['admin', 'administrativo'] },
+      // Soporte y financiero pueden ver (read-only). Admin/administrativo editan.
+      { href: '/inventario', label: 'Inventario', icon: Package, roles: ['admin', 'administrativo', 'soporte', 'financiero'] },
       { href: '/conciliacion', label: 'Conciliación', icon: ClipboardCheck, roles: ['admin', 'administrativo'] },
     ],
   },
@@ -70,6 +71,7 @@ const navGroups: NavGroup[] = [
     label: 'Contabilidad',
     items: [
       { href: '/libro-diario', label: 'Libro Diario', icon: BookOpen, roles: ['admin', 'financiero'] },
+      { href: '/gastos', label: 'Gastos', icon: Receipt, roles: ['admin', 'financiero', 'administrativo'] },
     ],
   },
   {

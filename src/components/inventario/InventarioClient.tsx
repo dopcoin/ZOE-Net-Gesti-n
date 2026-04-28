@@ -4,12 +4,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { createMercancia, updateMercancia, deleteMercancia, getErrorMessage } from '@/lib/services';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, Package, AlertTriangle, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Package, AlertTriangle, X, Eye } from 'lucide-react';
 import type { Mercancia, CategoriaMercancia } from '@/types';
 
 interface Props {
   mercancia: Mercancia[];
   categorias: CategoriaMercancia[];
+  /** Si false, oculta botones de crear/editar/eliminar (solo lectura) */
+  canEdit?: boolean;
 }
 
 interface FormData {
@@ -34,7 +36,7 @@ const emptyForm: FormData = {
   activo: true,
 };
 
-export default function InventarioClient({ mercancia: initialMercancia, categorias }: Props) {
+export default function InventarioClient({ mercancia: initialMercancia, categorias, canEdit = true }: Props) {
   const [items, setItems] = useState<Mercancia[]>(initialMercancia);
   const [search, setSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('');
@@ -231,18 +233,31 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Package size={28} />
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 truncate">
+            <Package size={24} className="flex-shrink-0" />
             Inventario
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Gestion de mercancia y productos</p>
+          <p className="text-xs sm:text-sm text-gray-400 mt-1 flex items-center gap-1.5">
+            {canEdit ? (
+              'Gestión de mercancía y productos'
+            ) : (
+              <>
+                <Eye size={12} className="text-blue-400" />
+                <span className="text-blue-400">Modo solo lectura</span>
+                <span className="text-gray-500">— consulta sin edición</span>
+              </>
+            )}
+          </p>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-          <Plus size={16} />
-          Nuevo Producto
-        </button>
+        {canEdit && (
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2 flex-shrink-0">
+            <Plus size={16} />
+            <span className="hidden xs:inline">Nuevo Producto</span>
+            <span className="inline xs:hidden">Nuevo</span>
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -427,22 +442,26 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                         </span>
                       </td>
                       <td className="table-cell text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(item)}
-                            className="p-1.5 rounded-lg hover:bg-[#1C2333] text-gray-400 hover:text-blue-400 transition-colors"
-                            title="Editar"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id, item.nombre)}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
+                        {canEdit ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="p-1.5 rounded-lg hover:bg-[#1C2333] text-gray-400 hover:text-blue-400 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id, item.nombre)}
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-600">—</span>
+                        )}
                       </td>
                     </tr>
                   );

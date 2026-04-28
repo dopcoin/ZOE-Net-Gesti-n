@@ -10,9 +10,11 @@ import { toast } from 'sonner';
 import type { LibroDiario, TipoMovimiento } from '@/types';
 import {
   Plus, ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
-  DollarSign, Edit2, Trash2, X, BookOpen,
+  DollarSign, Edit2, Trash2, X, BookOpen, Calendar, Filter,
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
+
+type DateRangePreset = 'mes' | 'hoy' | 'semana' | 'mes-pasado' | '30dias' | 'anio' | 'custom';
 
 const DEFAULT_CATEGORIAS_ENTRADA = ['Cobros clientes', 'Servicios adicionales', 'Instalaciones', 'Otros ingresos'];
 const DEFAULT_CATEGORIAS_SALIDA = ['Infraestructura', 'Salarios', 'Equipos', 'Servicios externos', 'Mantenimiento', 'Otros gastos'];
@@ -51,6 +53,9 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<TipoMovimiento | 'todos'>('todos');
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('mes');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -86,14 +91,77 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
     ])).sort();
   }, [registros, initialCategorias]);
 
-  // Filter registros by current month/year
+  // Compute active date range based on preset/custom
+  const activeRange = useMemo(() => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    let start: Date;
+    let end: Date;
+    let label: string;
+    switch (datePreset) {
+      case 'hoy':
+        start = today;
+        end = today;
+        label = 'Hoy';
+        break;
+      case 'semana': {
+        const day = today.getDay() || 7; // 1=Mon..7=Sun
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - (day - 1));
+        start = monday;
+        end = today;
+        label = 'Esta semana';
+        break;
+      }
+      case 'mes-pasado': {
+        const m = currentMonth === 1 ? 12 : currentMonth - 1;
+        const y = currentMonth === 1 ? currentYear - 1 : currentYear;
+        start = new Date(y, m - 1, 1);
+        end = new Date(y, m, 0);
+        label = `${meses[m - 1]} ${y}`;
+        break;
+      }
+      case '30dias': {
+        const d30 = new Date(today);
+        d30.setDate(today.getDate() - 29);
+        start = d30;
+        end = today;
+        label = 'Últimos 30 días';
+        break;
+      }
+      case 'anio':
+        start = new Date(currentYear, 0, 1);
+        end = new Date(currentYear, 11, 31);
+        label = `Año ${currentYear}`;
+        break;
+      case 'custom':
+        if (customStart && customEnd) {
+          start = new Date(customStart + 'T00:00:00');
+          end = new Date(customEnd + 'T00:00:00');
+          label = `${formatDate(customStart)} - ${formatDate(customEnd)}`;
+        } else {
+          start = new Date(currentYear, currentMonth - 1, 1);
+          end = new Date(currentYear, currentMonth, 0);
+          label = `${meses[currentMonth - 1]} ${currentYear}`;
+        }
+        break;
+      case 'mes':
+      default:
+        start = new Date(currentYear, currentMonth - 1, 1);
+        end = new Date(currentYear, currentMonth, 0);
+        label = `${meses[currentMonth - 1]} ${currentYear}`;
+        break;
+    }
+    return { start: fmt(start), end: fmt(end), label };
+  }, [datePreset, currentMonth, currentYear, customStart, customEnd, now]);
+
+  // Filter registros by active date range
   const registrosMes = useMemo(() => {
     return registros.filter((r) => {
       if (!r.fecha) return false;
-      const d = new Date(r.fecha + 'T00:00:00');
-      return d.getFullYear() === currentYear && d.getMonth() + 1 === currentMonth;
+      return r.fecha >= activeRange.start && r.fecha <= activeRange.end;
     });
-  }, [registros, currentMonth, currentYear]);
+  }, [registros, activeRange]);
 
   const filtered = useMemo(() => {
     return registrosMes.filter((r) => {
@@ -273,21 +341,21 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="h-4 w-4 text-emerald-400" />
-            <span className="stat-label text-xs">Entradas del mes</span>
+            <span className="stat-label text-xs">Entradas del período</span>
           </div>
           <p className="text-lg font-bold text-emerald-400">{formatCurrency(stats.entradas)}</p>
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="h-4 w-4 text-red-400" />
-            <span className="stat-label text-xs">Salidas del mes</span>
+            <span className="stat-label text-xs">Salidas del período</span>
           </div>
           <p className="text-lg font-bold text-red-400">{formatCurrency(stats.salidas)}</p>
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-1">
             <DollarSign className="h-4 w-4 text-blue-400" />
-            <span className="stat-label text-xs">Balance del mes</span>
+            <span className="stat-label text-xs">Balance del período</span>
           </div>
           <p className={`text-lg font-bold ${stats.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {formatCurrency(stats.balance)}
@@ -304,43 +372,113 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
         </div>
       </div>
 
-      {/* Month navigator + filters */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <button onClick={prevMonth} className="btn-icon flex-shrink-0">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <span className="text-base sm:text-lg font-semibold text-gray-100 text-center capitalize flex-1">
-            {meses[currentMonth - 1]} {currentYear}
-          </span>
-          <button onClick={nextMonth} className="btn-icon flex-shrink-0">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {(['todos', 'ingreso', 'egreso'] as const).map((t) => (
+      {/* Date range presets + month navigator */}
+      <div className="card p-3 sm:p-4 space-y-3">
+        {/* Quick presets */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          {([
+            { k: 'hoy', label: 'Hoy' },
+            { k: 'semana', label: 'Esta semana' },
+            { k: 'mes', label: 'Este mes' },
+            { k: 'mes-pasado', label: 'Mes pasado' },
+            { k: '30dias', label: 'Últimos 30 días' },
+            { k: 'anio', label: 'Este año' },
+            { k: 'custom', label: 'Personalizado' },
+          ] as { k: DateRangePreset; label: string }[]).map((p) => (
             <button
-              key={t}
-              onClick={() => setTipoFilter(t)}
-              className={`flex-1 sm:flex-initial px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                tipoFilter === t
-                  ? t === 'ingreso' ? 'bg-emerald-600 text-white'
-                    : t === 'egreso' ? 'bg-red-600 text-white'
-                    : 'bg-blue-600 text-white'
-                  : 'bg-[#1C2333] text-gray-400 hover:text-gray-200'
+              key={p.k}
+              onClick={() => setDatePreset(p.k)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                datePreset === p.k
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-[#1C2333] text-gray-400 hover:text-gray-200 border border-[#1F2937]'
               }`}
             >
-              {t === 'todos' ? 'Todos' : t === 'ingreso' ? 'Entradas' : 'Salidas'}
+              {p.label}
             </button>
           ))}
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar..."
-            className="input text-sm flex-1 sm:flex-initial sm:w-40"
-          />
         </div>
+
+        {/* Month navigator (visible cuando preset = mes) o custom range */}
+        {datePreset === 'mes' && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <button onClick={prevMonth} className="btn-icon flex-shrink-0" aria-label="Mes anterior">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div className="text-center flex-1">
+              <div className="text-base sm:text-lg font-semibold text-gray-100 capitalize">
+                {meses[currentMonth - 1]} {currentYear}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                {formatDate(activeRange.start)} → {formatDate(activeRange.end)}
+              </div>
+            </div>
+            <button onClick={nextMonth} className="btn-icon flex-shrink-0" aria-label="Mes siguiente">
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {datePreset === 'custom' && (
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label className="label flex items-center gap-1">
+                <Calendar size={11} /> Desde
+              </label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label flex items-center gap-1">
+                <Calendar size={11} /> Hasta
+              </label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="input"
+              />
+            </div>
+          </div>
+        )}
+
+        {datePreset !== 'mes' && datePreset !== 'custom' && (
+          <div className="text-center text-xs text-gray-500 pt-1">
+            <span className="font-semibold text-gray-300">{activeRange.label}</span>{' '}
+            · {formatDate(activeRange.start)} → {formatDate(activeRange.end)}
+          </div>
+        )}
+      </div>
+
+      {/* Tipo filter + búsqueda */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <Filter size={14} className="text-gray-500 hidden sm:inline" />
+        {(['todos', 'ingreso', 'egreso'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTipoFilter(t)}
+            className={`flex-1 sm:flex-initial px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tipoFilter === t
+                ? t === 'ingreso' ? 'bg-emerald-600 text-white'
+                  : t === 'egreso' ? 'bg-red-600 text-white'
+                  : 'bg-blue-600 text-white'
+                : 'bg-[#1C2333] text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {t === 'todos' ? 'Todos' : t === 'ingreso' ? 'Entradas' : 'Salidas'}
+          </button>
+        ))}
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar descripción, categoría, ref..."
+          className="input text-sm flex-1 min-w-[180px] sm:max-w-xs"
+        />
       </div>
 
       {/* Mobile: list cards */}

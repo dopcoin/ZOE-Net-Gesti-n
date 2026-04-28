@@ -6,6 +6,36 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-04-28
+
+### Added
+- **Apartado de Gastos** (`/gastos`) — vista especializada de egresos del Libro Diario:
+  - 7 categorías visuales predefinidas con iconos (Nóminas, Mantenimientos, Viáticos, Servicios, Equipos, Suministros, Otros)
+  - Cards de categoría clickables: filtran la lista y permiten crear gasto en esa categoría con un click
+  - Total general por período + totales individuales por categoría
+  - Quick filters (Hoy, Este mes, Mes pasado, Este año)
+  - Form rápido con beneficiario, método de pago, referencia, fecha
+  - Vista mobile (cards) + desktop (tabla)
+- **Libro Diario con rango de fechas + quick filters**:
+  - Presets: Hoy, Esta semana, Este mes, Mes pasado, Últimos 30 días, Este año, Personalizado
+  - Selector de rango custom con dos campos `date`
+  - El rango activo aplica también al cálculo de stats del período
+- **Permisos granulares de Inventario**:
+  - `soporte` y `financiero` pueden ver el inventario en modo solo lectura
+  - `admin` y `administrativo` mantienen control total (crear/editar/eliminar)
+  - Indicador visual "Modo solo lectura" en el header
+  - Botones de acción ocultos para usuarios sin permisos de edición
+- **Facturas con vinculación a inventario, ITBIS toggle, fecha editable** (de v1.0.x previo recopilado).
+
+### Changed
+- Sidebar: nuevo item **Gastos** en grupo Contabilidad (visible para admin/financiero/administrativo).
+- Header: breadcrumb actualizado para `/gastos`.
+
+### Fixed
+- Stats del Libro Diario muestran "del período" en vez de "del mes" cuando el rango no es mensual.
+
+---
+
 ## [1.0.0] — 2026-04-23
 
 Primera versión estable. Plataforma completa de gestión ISP con contabilidad, facturación, inventario y análisis financiero.

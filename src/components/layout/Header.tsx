@@ -22,6 +22,7 @@ const routeMeta: Record<string, { title: string; group?: string }> = {
   '/inventario':     { title: 'Inventario',   group: 'Inventario' },
   '/conciliacion':   { title: 'Conciliación', group: 'Inventario' },
   '/libro-diario':   { title: 'Libro Diario', group: 'Contabilidad' },
+  '/gastos':         { title: 'Gastos',       group: 'Contabilidad' },
   '/equipo':         { title: 'Equipo',       group: 'Sistema' },
 };
 
