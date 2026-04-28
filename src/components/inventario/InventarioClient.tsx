@@ -542,6 +542,51 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                 </div>
               </div>
 
+              {/* Markup rápido — aparece cuando hay precio de compra */}
+              {parseFloat(formData.precio_compra) > 0 && (
+                <div className="bg-[#0A0F1E] rounded-lg p-3 border border-[#1F2937]">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-400">
+                      {formData.precio_venta
+                        ? 'Aplicar markup rápido'
+                        : 'Sin precio de venta — aplicar markup'}
+                    </p>
+                    {formData.precio_venta && (
+                      <button
+                        type="button"
+                        onClick={() => updateField('precio_venta', '')}
+                        className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[20, 30, 60, 80, 100].map((pct) => {
+                      const compra = parseFloat(formData.precio_compra) || 0;
+                      const venta = compra * (1 + pct / 100);
+                      const ventaActual = parseFloat(formData.precio_venta) || 0;
+                      const isActive = Math.abs(venta - ventaActual) < 0.01;
+                      return (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => updateField('precio_venta', venta.toFixed(2))}
+                          title={`${formatCurrency(venta)} (markup ${pct}%)`}
+                          className={`py-2 px-2 rounded-lg text-sm font-semibold border transition-all active:scale-95 ${
+                            isActive
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-sm shadow-emerald-500/20'
+                              : 'bg-[#1C2333] border-[#1F2937] text-gray-300 hover:border-blue-500/50 hover:text-blue-400'
+                          }`}
+                        >
+                          +{pct}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Live margin calculator */}
               {(formData.precio_compra || formData.precio_venta) && (
                 <div className="bg-[#0A0F1E] rounded-lg p-3 border border-[#1F2937]">
