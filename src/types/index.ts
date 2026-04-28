@@ -166,6 +166,8 @@ export interface FacturaItem {
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
+  /** Si el item viene del inventario, se vincula para descontar stock */
+  mercancia_id?: string | null;
 }
 
 export interface Factura {
@@ -179,6 +181,8 @@ export interface Factura {
   total: number;
   estado: EstadoFactura;
   notas: string | null;
+  /** Fecha de la factura (editable). Si null, usar created_at */
+  fecha: string | null;
   created_by: string | null;
   created_at: string;
   clientes?: Cliente;
