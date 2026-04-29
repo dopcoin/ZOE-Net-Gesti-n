@@ -25,6 +25,7 @@ const emptyForm = {
   monto_mensual: 0,
   estado: 'nuevo' as EstadoCliente,
   fecha_instalacion: null as string | null,
+  fecha_retiro: null as string | null,
   inscripcion: null as string | null,
   nombre_red: null as string | null,
   password_router: null as string | null,
@@ -146,6 +147,7 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       monto_mensual: cliente.monto_mensual,
       estado: cliente.estado,
       fecha_instalacion: cliente.fecha_instalacion,
+      fecha_retiro: (cliente as unknown as Record<string, unknown>).fecha_retiro as string | null ?? null,
       inscripcion: (cliente as unknown as Record<string, unknown>).inscripcion as string | null ?? null,
       nombre_red: cliente.nombre_red,
       password_router: cliente.password_router,
@@ -197,6 +199,7 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       monto_mensual: formData.monto_mensual || 0,
       estado: formData.estado || 'activo',
       fecha_instalacion: formData.fecha_instalacion,
+      fecha_retiro: formData.fecha_retiro,
       nombre_red: formData.nombre_red,
       password_router: formData.password_router,
       password_antena: formData.password_antena,
@@ -219,6 +222,13 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
     payload.estado = raw.estado;
     payload.monto_mensual = raw.monto_mensual;
     payload.beca = formData.beca; // boolean — must always be included even if false
+    // fecha_retiro: incluir solo si tiene valor (al reactivar cliente, hay que limpiar manualmente)
+    if (formData.fecha_retiro) {
+      payload.fecha_retiro = formData.fecha_retiro;
+    } else if (formData.estado === 'activo' || formData.estado === 'becado' || formData.estado === 'nuevo') {
+      // Cliente reactivado → limpiar la fecha de retiro
+      payload.fecha_retiro = null;
+    }
     return payload;
   };
 
@@ -637,7 +647,21 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                   <select
                     name="estado"
                     value={formData.estado}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      const newEstado = e.target.value as EstadoCliente;
+                      setFormData((prev) => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const isRetirado = newEstado === 'suspendido' || newEstado === 'inactivo';
+                        return {
+                          ...prev,
+                          estado: newEstado,
+                          // Auto-llenar fecha_retiro al pasar a retirado, o limpiarla al reactivar
+                          fecha_retiro: isRetirado
+                            ? (prev.fecha_retiro || today)
+                            : null,
+                        };
+                      });
+                    }}
                     className="input w-full"
                   >
                     {ESTADOS.map((e) => (
@@ -657,6 +681,26 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
                     className="input w-full"
                   />
                 </div>
+                {/* Fecha de retiro — solo visible si suspendido o inactivo */}
+                {(formData.estado === 'suspendido' || formData.estado === 'inactivo') && (
+                  <div className="md:col-span-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                    <label className="label flex items-center gap-1.5 text-red-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                      Fecha de retiro
+                    </label>
+                    <input
+                      name="fecha_retiro"
+                      type="date"
+                      value={formData.fecha_retiro ?? ''}
+                      onChange={handleChange}
+                      className="input w-full"
+                    />
+                    <p className="text-[11px] text-red-400/70 mt-1.5">
+                      ⚠ Este cliente NO aparecerá en la lista de Cobros para nuevos meses.
+                      Sus cobros históricos siguen visibles.
+                    </p>
+                  </div>
+                )}
                 {/* Beca toggle - full width */}
                 <div className="md:col-span-2 border-t border-[#1F2937] pt-4">
                   <div className="flex items-center justify-between">

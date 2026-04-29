@@ -51,6 +51,7 @@ export interface Cliente {
   beca: boolean;
   beca_descripcion: string | null;
   fecha_instalacion: string | null;
+  fecha_retiro: string | null;
   nombre_red: string | null;
   password_router: string | null;
   password_antena: string | null;

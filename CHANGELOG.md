@@ -6,6 +6,21 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-04-29
+
+### Added
+- **Fecha de retiro de clientes**: nuevo campo `fecha_retiro DATE` en tabla `clientes`.
+  - Migración SQL: `supabase/migrations/20260429_v1_3_1_fecha_retiro.sql`
+  - Aparece automáticamente en el form de cliente cuando el estado es `suspendido` o `inactivo`
+  - Auto-llenado con fecha actual al cambiar el estado a retirado
+  - Se limpia automáticamente al reactivar el cliente
+- **Clientes retirados ya no aparecen en `/cobros`**:
+  - El query ahora filtra por `estado in ('activo', 'becado', 'nuevo')` — los suspendidos/inactivos quedan fuera
+  - Sus cobros históricos siguen visibles en Finanzas y Libro Diario (auditoría)
+
+### Fixed
+- Crash en búsqueda de clientes/cobros/ventas/instalaciones/facturas/historial cuando algún cliente tenía `apellido = null` (introducido por la importación del sheet con clientes de un solo nombre).
+
 ## [1.3.0] — 2026-04-29
 
 ### Added
