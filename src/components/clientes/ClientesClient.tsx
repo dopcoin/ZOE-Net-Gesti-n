@@ -110,8 +110,8 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
     const term = search.toLowerCase();
     const matchSearch =
       !term ||
-      c.nombre.toLowerCase().includes(term) ||
-      c.apellido.toLowerCase().includes(term) ||
+      (c.nombre || '').toLowerCase().includes(term) ||
+      (c.apellido || '').toLowerCase().includes(term) ||
       (c.cedula && c.cedula.toLowerCase().includes(term));
     return matchEstado && matchSearch;
   });

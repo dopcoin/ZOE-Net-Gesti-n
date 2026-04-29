@@ -102,7 +102,7 @@ export default function RevendedoresClient({ revendedores: initialRevendedores, 
         if (typeof val === 'string') return val.toLowerCase().includes(search.toLowerCase());
         if (val && typeof val === 'object' && 'nombre' in (val as Record<string, unknown>)) {
           const nested = val as Record<string, string>;
-          return `${nested.nombre} ${nested.apellido}`.toLowerCase().includes(search.toLowerCase());
+          return `${nested.nombre || ''} ${nested.apellido || ''}`.toLowerCase().includes(search.toLowerCase());
         }
         return false;
       })

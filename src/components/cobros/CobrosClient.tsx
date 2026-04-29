@@ -96,7 +96,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       if (localidadFilter && cc.cliente.localidad !== localidadFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
-        if (!`${cc.cliente.nombre} ${cc.cliente.apellido}`.toLowerCase().includes(q)) return false;
+        if (!`${cc.cliente.nombre || ''} ${cc.cliente.apellido || ''}`.toLowerCase().includes(q)) return false;
       }
       return true;
     });

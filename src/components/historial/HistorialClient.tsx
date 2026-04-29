@@ -83,7 +83,7 @@ export default function HistorialClient({ logs, profiles }: Props) {
       }
       if (search.trim()) {
         const q = search.toLowerCase();
-        const userName = log.profiles ? `${log.profiles.nombre} ${log.profiles.apellido}`.toLowerCase() : (log.usuario_nombre ?? '').toLowerCase();
+        const userName = log.profiles ? `${log.profiles.nombre || ''} ${log.profiles.apellido || ''}`.toLowerCase() : (log.usuario_nombre ?? '').toLowerCase();
         return (
           log.accion.toLowerCase().includes(q) ||
           (log.detalle ?? '').toLowerCase().includes(q) ||

@@ -75,9 +75,9 @@ export default function VentasClient({ ventas: initial, mercancia, clientes, rev
     const matchTipo = filtroTipo === 'todos' || v.tipo === filtroTipo;
     const matchSearch =
       search === '' ||
-      v.mercancia?.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      v.clientes?.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      v.revendedores?.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      (v.mercancia?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.clientes?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
+      (v.revendedores?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
       (v.notas ?? '').toLowerCase().includes(search.toLowerCase());
     return matchTipo && matchSearch;
   });

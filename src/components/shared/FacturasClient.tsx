@@ -123,7 +123,7 @@ export default function FacturasClient({ facturas: initial, clientes, mercancia 
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     const clienteName = f.clientes
-      ? `${f.clientes.nombre} ${f.clientes.apellido}`.toLowerCase()
+      ? `${f.clientes.nombre || ''} ${f.clientes.apellido || ''}`.toLowerCase()
       : '';
     return f.numero.toLowerCase().includes(q) || clienteName.includes(q);
   });

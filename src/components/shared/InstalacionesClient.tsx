@@ -111,8 +111,8 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
     const matchEstado = filtroEstado === 'todos' || i.estado === filtroEstado;
     const matchSearch =
       search === '' ||
-      i.clientes?.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      i.clientes?.apellido.toLowerCase().includes(search.toLowerCase()) ||
+      (i.clientes?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.clientes?.apellido || '').toLowerCase().includes(search.toLowerCase()) ||
       i.direccion.toLowerCase().includes(search.toLowerCase()) ||
       (i.tecnico_asignado ?? '').toLowerCase().includes(search.toLowerCase());
     return matchEstado && matchSearch;
