@@ -9,7 +9,7 @@ import { APP_VERSION } from '@/lib/version';
 import {
   LayoutDashboard, Users, CreditCard, Package, Repeat2,
   Wrench, ShoppingCart, ClipboardCheck, FileText, BookOpen,
-  CheckSquare, UserCog, BarChart3, PiggyBank, Receipt,
+  CheckSquare, UserCog, BarChart3, PiggyBank, Receipt, History,
   ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -79,6 +79,7 @@ const navGroups: NavGroup[] = [
     label: 'Sistema',
     items: [
       { href: '/equipo', label: 'Equipo', icon: UserCog, roles: ['admin', 'administrativo'] },
+      { href: '/historial', label: 'Historial', icon: History, roles: ['admin'] },
     ],
   },
 ];

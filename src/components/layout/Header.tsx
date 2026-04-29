@@ -24,6 +24,7 @@ const routeMeta: Record<string, { title: string; group?: string }> = {
   '/libro-diario':   { title: 'Libro Diario', group: 'Contabilidad' },
   '/gastos':         { title: 'Gastos',       group: 'Contabilidad' },
   '/equipo':         { title: 'Equipo',       group: 'Sistema' },
+  '/historial':      { title: 'Historial',    group: 'Sistema' },
 };
 
 export default function Header() {

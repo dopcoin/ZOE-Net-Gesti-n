@@ -7,9 +7,10 @@ import { useAuthStore } from '@/store/authStore';
 import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
 import { formatDate, estadoInstalacionColor, prioridadColor, meses } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign, ImageIcon, Camera } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { EstadoInstalacion, Prioridad } from '@/types';
+import PhotoGallery from '@/components/shared/PhotoGallery';
 
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
 
@@ -28,6 +29,7 @@ interface Instalacion {
   descripcion_cobro?: string;
   metodo_pago?: string | null;
   recibido_en?: string | null;
+  fotos?: string[] | null;
   created_at: string;
   clientes?: { nombre: string; apellido: string };
 }
@@ -74,6 +76,7 @@ const defaultForm = {
   descripcion_cobro: '',
   metodo_pago: '',
   recibido_en: '',
+  fotos: [] as string[],
 };
 
 export default function InstalacionesClient({ instalaciones: initial, clientes, tecnicos, recibidosPor: initialRecibidosPor }: Props) {
@@ -159,6 +162,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       descripcion_cobro: inst.descripcion_cobro ?? '',
       metodo_pago: inst.metodo_pago ?? '',
       recibido_en: inst.recibido_en ?? '',
+      fotos: Array.isArray(inst.fotos) ? inst.fotos : [],
     });
     setShowNewRecibidoEn(false);
     setNewRecibidoEn('');
@@ -213,6 +217,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       descripcion_cobro: form.descripcion_cobro || null,
       metodo_pago: form.estado_cobro !== 'sin_costo' ? (form.metodo_pago || null) : null,
       recibido_en: form.estado_cobro !== 'sin_costo' ? (form.recibido_en || null) : null,
+      fotos: form.fotos,
     };
 
     if (editing) {
@@ -335,7 +340,18 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
               filtered.map((inst) => (
                 <tr key={inst.id} className="border-b border-[#1F2937]/50 hover:bg-[#1C2333]/50 transition-colors">
                   <td className="table-cell font-medium text-white">
-                    {inst.clientes ? `${inst.clientes.nombre} ${inst.clientes.apellido}` : '—'}
+                    <div className="flex items-center gap-2">
+                      <span>{inst.clientes ? `${inst.clientes.nombre} ${inst.clientes.apellido}` : '—'}</span>
+                      {Array.isArray(inst.fotos) && inst.fotos.length > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20"
+                          title={`${inst.fotos.length} foto${inst.fotos.length !== 1 ? 's' : ''}`}
+                        >
+                          <ImageIcon size={10} />
+                          {inst.fotos.length}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="table-cell capitalize">{inst.tipo}</td>
                   <td className="table-cell">{inst.direccion}</td>
@@ -627,6 +643,38 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                   </div>
                 )}
               </div>
+
+              {/* Fotos — solo cuando ya existe la instalación (necesita ID para path) */}
+              {editing && (
+                <div className="border-t border-[#1F2937] pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="label flex items-center gap-1 mb-0">
+                      <Camera size={12} className="text-blue-400" />
+                      Fotos de seguimiento
+                    </label>
+                    <span className="text-[10px] text-gray-500">
+                      Para evidencia técnica del caso
+                    </span>
+                  </div>
+                  <PhotoGallery
+                    bucket="instalacion-fotos"
+                    folderPath={`instalaciones/${editing.id}`}
+                    paths={form.fotos}
+                    onChange={(paths) => setForm({ ...form, fotos: paths })}
+                    max={10}
+                    maxSizeMB={5}
+                  />
+                </div>
+              )}
+
+              {!editing && (
+                <div className="border-t border-[#1F2937] pt-3">
+                  <div className="text-xs text-gray-500 italic flex items-center gap-2 p-3 bg-[#0F1725] border border-[#1F2937] rounded-lg">
+                    <Camera size={14} className="text-gray-600 flex-shrink-0" />
+                    <span>Las fotos se podrán agregar después de crear la instalación (al editarla).</span>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="label">Notas</label>

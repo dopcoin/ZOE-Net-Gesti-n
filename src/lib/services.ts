@@ -322,6 +322,56 @@ export async function marcarGananciaPagada(id: string): Promise<ServiceResult> {
   } catch (e) { return { error: handleError(e) }; }
 }
 
+// ==================== ACTIVITY LOG ====================
+/**
+ * Registra una acción del usuario en activity_log.
+ *
+ * Uso:
+ * ```ts
+ * await logActivity({
+ *   accion: 'Cliente creado',
+ *   entidad: 'clientes',
+ *   entidad_id: cliente.id,
+ *   detalle: `${cliente.nombre} ${cliente.apellido}`,
+ * });
+ * ```
+ *
+ * No bloquea ni lanza errores — falla silenciosamente con console.warn.
+ */
+export async function logActivity(params: {
+  accion: string;
+  entidad?: string | null;
+  entidad_id?: string | null;
+  detalle?: string | null;
+  detalles?: Record<string, unknown> | null;
+}): Promise<void> {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('nombre, apellido')
+      .eq('id', user.id)
+      .single();
+    const usuario_nombre = profile ? `${profile.nombre} ${profile.apellido}` : null;
+
+    const payload: Record<string, unknown> = {
+      usuario_id: user.id,
+      usuario_nombre,
+      accion: params.accion,
+      entidad: params.entidad ?? null,
+      entidad_id: params.entidad_id ?? null,
+      detalle: params.detalle ?? null,
+      detalles: params.detalles ?? null,
+    };
+    await supabase.from('activity_log').insert(payload);
+  } catch (e) {
+    // Silencioso — no queremos romper el UX si falla el log
+    console.warn('[activity_log] error:', e);
+  }
+}
+
 // ==================== HELPER: Show error toast ====================
 export function getErrorMessage(error: ServiceError): string {
   let msg = error.message;

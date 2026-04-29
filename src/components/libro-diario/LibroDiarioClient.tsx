@@ -93,7 +93,8 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
 
   // Compute active date range based on preset/custom
   const activeRange = useMemo(() => {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const n = new Date();
+    const today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
     const fmt = (d: Date) => d.toISOString().split('T')[0];
     let start: Date;
     let end: Date;
@@ -153,7 +154,7 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
         break;
     }
     return { start: fmt(start), end: fmt(end), label };
-  }, [datePreset, currentMonth, currentYear, customStart, customEnd, now]);
+  }, [datePreset, currentMonth, currentYear, customStart, customEnd]);
 
   // Filter registros by active date range
   const registrosMes = useMemo(() => {
