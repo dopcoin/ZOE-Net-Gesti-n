@@ -6,6 +6,17 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-04-29
+
+### Added
+- **Seed inicial de datos** (`supabase/migrations/20260429_v1_3_0_seed_inicial.sql`):
+  - Importación desde el Google Sheets histórico "Cobros ZAID-INTERNET"
+  - **38 clientes** con localidad, monto mensual, estado, becas, fecha de inicio y notas
+  - **~140 cobros mensuales** (nov 2025 → abr 2026) con estado, tipo de pago y "recibido por"
+  - **18 productos de inventario** (orden septiembre 2025 + orden enero 2026)
+  - SQL **idempotente** (NOT EXISTS) — re-ejecutable sin duplicar
+  - Bloque de verificación al final que reporta totales en NOTICE
+
 ### Pendiente
 - Rediseño de **Conciliaciones** como flujo de consignación a revendedores:
   - Tabla nueva o extensión de `conciliacion` para registrar equipos entregados al revendedor (consignación).
