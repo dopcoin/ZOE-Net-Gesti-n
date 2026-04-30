@@ -1,0 +1,294 @@
+HANDOFF TÉCNICO — ZOE NET GESTIÓN
+===================================
+
+Para desarrolladores que continúen el proyecto.
+Versión: v1.5.0 · 30 abril 2026
+
+
+1. STACK
+========
+
+Frontend:
+- Next.js 14 (App Router)
+- TypeScript strict
+- Tailwind CSS 3 (con tema custom en tailwind.config.ts)
+- Recharts (gráficos)
+- Lucide React (iconos)
+- Sonner (toasts)
+- Zustand (estado global con persist)
+
+Backend:
+- Supabase (managed Postgres + Auth + Storage + Realtime)
+- @supabase/ssr para SSR de Next.js
+- @supabase/supabase-js v2.101+
+
+Deploy:
+- Vercel auto-deploy desde rama main
+- Variables de entorno en Vercel Project Settings
+
+
+2. ESTRUCTURA DE CARPETAS
+=========================
+
+src/
+├── app/
+│   ├── layout.tsx              ← Root layout con viewport mobile
+│   ├── globals.css             ← Design system completo
+│   ├── (dashboard)/            ← Páginas autenticadas
+│   │   ├── layout.tsx          ← Sidebar + Header + Bottom nav
+│   │   ├── dashboard/          ← Cockpit financiero
+│   │   ├── clientes/
+│   │   ├── cobros/
+│   │   ├── inventario/
+│   │   ├── revendedores/
+│   │   ├── instalaciones/
+│   │   ├── ventas/
+│   │   ├── conciliacion/
+│   │   ├── facturas/
+│   │   ├── libro-diario/
+│   │   ├── finanzas/
+│   │   ├── gastos/
+│   │   ├── tareas/
+│   │   ├── equipo/
+│   │   ├── reportes/
+│   │   └── historial/
+│   └── login/                  ← Auth flow
+├── components/
+│   ├── layout/                 ← Sidebar, Header, MobileBottomNav, AuthProvider
+│   ├── shared/                 ← PageHeader, PhotoGallery, etc.
+│   ├── dashboard/
+│   ├── cobros/
+│   ├── clientes/
+│   ├── inventario/
+│   ├── finanzas/
+│   ├── gastos/
+│   ├── historial/
+│   └── libro-diario/
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts           ← createBrowserClient
+│   │   └── server.ts           ← createServerClient con cookies
+│   ├── services.ts             ← CRUD centralizado + logActivity
+│   ├── utils.ts                ← formatCurrency, formatDate, helpers
+│   └── version.ts              ← APP_VERSION, BUILD_DATE
+├── store/                      ← Zustand stores
+├── types/index.ts              ← TypeScript interfaces
+└── middleware.ts               ← Auth middleware Supabase
+
+supabase/
+├── migrations/                 ← SQL versionado (idempotente)
+│   ├── 20260428_v1_2_0_storage_y_fotos.sql
+│   ├── 20260429_v1_3_0_seed_inicial.sql
+│   ├── 20260429_v1_3_1_fecha_retiro.sql
+│   ├── 20260429_v1_3_2_condonado.sql
+│   └── EJECUTAR_AHORA.sql      ← consolidado
+
+scripts/
+├── run-seed-v2.mjs             ← Importa datos del Google Sheets
+├── run-migration.mjs           ← Aplica migraciones via Management API
+└── dry-run-seed.mjs            ← Dry run del seed
+
+handoff/                        ← Documentación de handoff
+└── ...
+
+docs/drive/                     ← Documentos para subir a Google Drive
+└── ...
+
+
+3. PATRONES CLAVE
+=================
+
+A. SERVER COMPONENTS para fetch inicial:
+   src/app/(dashboard)/cobros/page.tsx hace fetch con:
+     const supabase = await createClient();
+     const { data: cobros } = await supabase.from('cobros').select(...);
+   Después pasa data al Client Component como prop.
+
+B. CLIENT COMPONENTS para interactividad:
+   - 'use client' al inicio
+   - useAuthStore() para perfil
+   - createClient() de lib/supabase/client para mutaciones
+   - services.ts centraliza CRUD
+
+C. SYNC LIBRO DIARIO:
+   - Cada cobro/venta/factura/instalación pagada → entrada en libro_diario
+   - origen_id + origen_tipo permiten trazar
+   - Borrar entrada → revierte source O elimina source (depende del tipo)
+
+D. ACTIVITY LOG:
+   - logActivity() en services.ts
+   - Llamado en cada CRUD automáticamente
+   - Página /historial filtra por usuario/entidad/acción
+
+E. RLS (Row Level Security):
+   - Habilitado en TODAS las tablas
+   - Política "Gestionar X" típica para todos los autenticados
+   - libro_diario tiene política especial "ver_libro_diario" para SELECT
+
+F. DESIGN SYSTEM:
+   - Variables de Tailwind en tailwind.config.ts
+   - Clases reutilizables en globals.css:
+     · .card, .stat-card, .kpi-card
+     · .btn-primary, .btn-secondary, .btn-danger
+     · .badge, .badge-success, .badge-warning, etc.
+     · .modal-overlay, .modal-content (bottom-sheet en móvil)
+     · .list-card (para vista mobile de listas)
+
+
+4. BASE DE DATOS — TABLAS PRINCIPALES
+======================================
+
+profiles                ← Usuarios del sistema (1:1 con auth.users)
+clientes                ← CRM
+cobros                  ← Pagos mensuales por cliente
+mercancia               ← Inventario
+ventas                  ← Ventas de productos
+revendedores            ← Socios externos
+ganancias_revendedores  ← Comisiones a pagar
+instalaciones           ← Trabajos técnicos
+facturas                ← Documentos formales
+libro_diario            ← Contabilidad básica
+tareas                  ← TODOs por equipo
+conciliacion            ← Stock físico vs sistema
+activity_log            ← Audit trail (poblada por logActivity)
+categorias_mercancia    ← Categorías de productos
+
+
+5. AUTH FLOW
+============
+
+1. Usuario va a /login
+2. Email + password → Supabase Auth
+3. Si OK: redirect a /dashboard
+4. Middleware valida sesión en cada request
+5. AuthProvider carga el profile (con rol y equipo)
+6. Sidebar filtra menú según rol
+
+
+6. ROLES
+========
+
+admin            → todo
+financiero       → cobros, facturas, ventas, libro diario, finanzas, reportes, gastos
+administrativo   → inventario, conciliacion, revendedores, equipo
+soporte          → clientes, instalaciones, tareas
+
+
+7. DEPLOY & CI/CD
+=================
+
+Deploy automático:
+- Push a rama main → Vercel detecta cambio
+- Build de Next.js + lint
+- Deploy en ~2 minutos
+
+Variables de entorno (Vercel Project Settings):
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY (puede ser legacy o publishable)
+
+Migraciones SQL:
+- Manualmente: pegar en Supabase SQL Editor
+- Programáticamente: scripts/run-migration.mjs con SUPABASE_PAT
+
+
+8. VERSIONADO
+=============
+
+Semantic Versioning (MAJOR.MINOR.PATCH):
+- PATCH: bug fixes (v1.4.1, v1.4.2)
+- MINOR: nuevas features retro-compatibles (v1.5.0)
+- MAJOR: breaking changes (v2.0.0)
+
+Cada release:
+1. Bump en package.json y src/lib/version.ts
+2. Update CHANGELOG.md
+3. git tag -a vX.Y.Z -m "..."
+4. git push --tags
+
+Scripts npm:
+- npm run release:patch
+- npm run release:minor
+- npm run release:major
+
+
+9. ENVIRONMENT LOCAL
+====================
+
+Setup:
+1. git clone https://github.com/dopcoin/ZOE-Net-Gesti-n.git
+2. cd ZOE-Net-Gesti-n
+3. npm install
+4. cp .env.example .env.local  (rellenar con valores de Supabase)
+5. npm run dev → localhost:3000
+
+Variables mínimas:
+NEXT_PUBLIC_SUPABASE_URL=https://....supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+
+Crear usuario admin:
+1. Supabase Dashboard → Auth → Users → Add User
+2. Después en SQL Editor:
+   INSERT INTO profiles (id, email, nombre, apellido, rol, equipo, activo)
+   VALUES ('UUID-FROM-AUTH', 'email@example.com', 'Nombre', 'Apellido',
+           'admin', 'administrativo', true);
+
+
+10. PROBLEMAS COMUNES Y SOLUCIONES
+==================================
+
+ERROR: "fecha_retiro column not found"
+SOLUCIÓN: Correr supabase/migrations/EJECUTAR_AHORA.sql
+
+ERROR: Cliente no aparece en /cobros
+CAUSA: estado != 'activo'/'becado'/'nuevo'
+SOLUCIÓN: Editar cliente, cambiar estado
+
+ERROR: Stock negativo después de venta
+CAUSA: Trigger de descuento de stock no se ejecutó
+SOLUCIÓN: Verificar manualmente y editar producto
+
+ERROR: WhatsApp no abre
+CAUSA: Cliente no tiene teléfono registrado
+SOLUCIÓN: Agregar teléfono en su ficha
+
+ERROR: 401 Unauthorized en cualquier query
+CAUSA: ANON key inválida o expirada
+SOLUCIÓN: Rotar key en Supabase y actualizar Vercel
+
+
+11. PENDIENTES TÉCNICOS
+=======================
+
+🔴 ALTA PRIORIDAD:
+   - Tests automatizados (Vitest + Playwright)
+   - Sentry o LogRocket para monitoreo de errores producción
+   - SQL views materializadas para stats pesadas
+
+🟡 MEDIA:
+   - Migrar filtros pesados a server-side (con paginación)
+   - Implementar SWR/React Query para caching de datos
+   - Optimizar bundle size (analyze + tree-shaking)
+   - PWA + service worker
+
+🟢 BAJA:
+   - Storybook para documentar componentes
+   - i18n (multilingual support)
+   - Monorepo si se separa cliente portal
+
+
+12. CONTACTOS PARA HANDOFF
+==========================
+
+Owner del proyecto: Sheka — dopcoinrd@gmail.com
+Repo GitHub: github.com/dopcoin/ZOE-Net-Gesti-n
+Supabase Dashboard: supabase.com/dashboard/project/bsiouklwhnxflorsrphz
+
+
+---
+Para más detalles, consultar:
+- README.md del repo
+- handoff/HANDOFF.md (más detallado)
+- handoff/CREDENCIALES.md
+- handoff/COMPARTIR-CREDENCIALES.md
+
+Última actualización: 30 abril 2026 · v1.5.0

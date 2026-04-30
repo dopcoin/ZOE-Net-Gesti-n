@@ -1,0 +1,269 @@
+ANÁLISIS EJECUTIVO — ZOE NET GESTIÓN
+=====================================
+
+Versión analizada: v1.5.0
+Fecha: 30 abril 2026
+
+
+1. RESUMEN EJECUTIVO
+====================
+
+La plataforma está en estado FUNCIONALMENTE COMPLETO. Cubre los flujos operacionales y financieros core de un ISP rural. Tiene fortalezas notables y oportunidades específicas de mejora.
+
+Lo bueno: arquitectura sólida (Next.js + Supabase), mobile-first, sync bidireccional libro diario, versionado profesional con SemVer + tags, datos reales importados, 38 releases en historia.
+
+Lo mejorable: velocidad operacional (clicks innecesarios), inteligencia accionable (datos sin insights), comunicación cliente (manual vía WhatsApp).
+
+
+2. SNAPSHOT ACTUAL
+==================
+
+DIMENSIÓN              ESTADO      COMENTARIO
+---------------------  ----------  --------------------------------------------
+Cobertura funcional    🟢 Alta     15 páginas cubren flujos core
+Mobile-first           🟢 Sí       Bottom nav, safe-area, modales bottom-sheet
+Datos importados       🟢          41 clientes, 148 cobros, 27 productos
+Sync financiero        🟢          Libro diario ↔ cobros/ventas/instalaciones/facturas
+Versionado             🟢          SemVer + 38 tags
+Performance            🟡          Sin optimizar, sin caching, sin SQL views
+Accesibilidad          🟡          Algunos aria-labels; falta keyboard nav consistente
+Documentación          🟢          CHANGELOG + handoff + carpeta Drive
+Tests automatizados    🔴          0% coverage
+
+
+3. FORTALEZAS A MANTENER
+========================
+
+✅ Sync bidireccional financiero — libro diario ↔ cobros/ventas/instalaciones/facturas. Robusto.
+✅ Versionado profesional — 38 releases con CHANGELOG detallado.
+✅ Mobile-first design system — bottom nav + safe-area + modales bottom-sheet.
+✅ Permisos por rol — read-only para soporte/financiero en inventario.
+✅ Estado "remitido" con porcentajes — 20/30/50/100 bien diseñado.
+✅ Detección de cheques en desglose de pagos via texto en recibido_por.
+✅ Activity log automático en TODOS los services (v1.5.0).
+✅ Bulk pagos en /cobros (v1.5.0).
+✅ WhatsApp recordatorio inline (v1.5.0).
+
+
+4. FRICTION POINTS IDENTIFICADOS (PRIORIZADOS)
+==============================================
+
+🔴 CRÍTICOS — afectan uso diario
+--------------------------------
+
+F1. Crear cliente es overwhelming.
+   Form con 3 tabs (General/Técnico/Notas), 25+ campos casi todos opcionales.
+   Tiempo onboarding por cliente ≈ 3-5 minutos.
+   IMPACTO: Alto durante onboarding masivo.
+
+F2. Búsqueda solo intra-página.
+   Para encontrar a "Yerni" hay que ir a Clientes y escribir.
+   No existe Cmd+K que busque entre clientes/cobros/facturas/instalaciones.
+   IMPACTO: Alto en uso diario.
+
+F3. Dashboard no prioriza acciones.
+   Te dice "X clientes, Y cobros pendientes" pero no responde:
+   "¿qué tengo que hacer hoy?"
+   IMPACTO: Alto en usabilidad.
+
+F4. Sin notificaciones automáticas.
+   No avisa: cliente pagó / cobro vence / stock crítico / instalación completada.
+   IMPACTO: Medio-alto.
+
+🟡 MEDIOS — fricción periódica
+------------------------------
+
+F5. Charts no son interactivos.
+   No puedes drill-down (click en barra → ver detalle del mes).
+
+F6. Formularios sin guardado automático.
+   Si pierdes la sesión escribiendo, pierdes todo.
+
+F7. Empty states genéricos.
+   Cuando no hay datos solo dice "No hay registros". Falta CTA.
+
+F8. Sin keyboard navigation completa.
+   Faltan atajos j/k en listas para navegar.
+
+F9. Sin export Excel.
+   Solo CSV en /finanzas. Falta XLSX, PDF, copy-to-clipboard.
+
+🟢 BAJOS — pulido
+----------------
+
+F10. Inconsistencia menor de modales.
+F11. Iconografía mixta (Edit2 vs Pencil en distintos sitios).
+F12. Sin dark/light toggle (siempre dark).
+F13. Tablas en desktop sin sorting clicable en columnas.
+F14. Sin breadcrumbs (el header tiene meta pero no clicable).
+F15. Sin ayuda contextual (tooltips en campos complejos).
+
+
+5. ÁREAS CON MAYOR OPORTUNIDAD
+==============================
+
+💼 PRODUCTIVIDAD OPERACIONAL — ROI MÁS ALTO
+   El uso real de la app es: "abro, registro 5-10 cobros, cierro".
+   - ✅ Bulk pago (hecho v1.5.0)
+   - ⏳ Vista "Cobros del día" filtrada por localidad
+   - ⏳ Comando rápido /c milagros → abre cobro de Milagros
+   - ⏳ Botón flotante mobile para "Nuevo cobro rápido"
+
+📊 INTELIGENCIA FINANCIERA
+   Tienes datos pero no los explotas. El usuario necesita RESPUESTAS.
+   - Forecasting: "Si todo se mantiene, fin de mes recibirás RD$ 51,800"
+   - Alertas: "Erick Gil debe RD$ 1,500 hace 60 días — proba contactarlo"
+   - Comparativos: "Este mes -12% vs anterior — Maciel y Yohana atrasados"
+   - What-if: "Si Francisco vuelve, +RD$ 1,500/mes recurrente"
+
+📱 COMUNICACIÓN CON CLIENTE
+   Hoy el cobrador llama por WhatsApp manualmente.
+   - ✅ Botón WhatsApp básico (hecho v1.5.0)
+   - ⏳ Recibo digital PDF al marcar pagado
+   - ⏳ Cliente portal con URL público por cliente
+
+🔐 AUDITORÍA Y TRAZABILIDAD
+   - ✅ logActivity automático (hecho v1.5.0)
+   - ✅ /historial filtrable por usuario/entidad/acción
+
+🎯 ONBOARDING Y DESCUBRIMIENTO
+   Si entrega el sistema a otra persona, no sabe por dónde empezar.
+   - ⏳ Tour guiado primera vez
+   - ⏳ Tooltips contextuales en botones complejos
+   - ⏳ Empty state actionable: "¿Aún no tienes cobros? Crea el primero →"
+
+
+6. QUICK WINS (≤ 1 día c/u, alto impacto)
+=========================================
+
+#  MEJORA                                          IMPACTO   ESFUERZO
+1  Cmd+K para buscar global                        Alto      4h
+2  Empty states con CTA                            Medio     3h
+3  Skeleton loaders                                Medio     4h
+4  Sticky filtros en /cobros y /finanzas           Medio     1h
+5  Atajos j/k para navegar listas                  Alto      2h
+6  Toast con "Deshacer" en eliminaciones           Medio     4h
+7  Card "Acción del día" en dashboard              Alto      6h
+8  Excel export en /finanzas y /reportes           Medio     5h
+9  Tooltips contextuales                           Medio     3h
+10 Tour guiado primera vez                         Alto      8h
+
+TOTAL Quick Wins: ~40 horas → 1 sprint
+
+
+7. INVESTMENTS ESTRATÉGICOS (1-2 semanas c/u)
+=============================================
+
+A. SISTEMA DE NOTIFICACIONES — 4 días
+   - Bell icon en header con badge
+   - Página /notificaciones
+   - Triggers automáticos: cobro vencido / cliente pagó / stock bajo
+
+B. RECIBOS DIGITALES PDF — 4 días
+   - Generación automática al marcar cobro pagado
+   - Template profesional con marca ZOE
+   - Compartir por WhatsApp en 1 click
+
+C. CLIENTE PORTAL PÚBLICO — 7 días
+   - URL pública /portal/{token-cliente} (sin login)
+   - Cliente ve su historial, deuda, próxima fecha
+   - Botón pagar con QR Banreservas
+   - PDF de recibos descargables
+
+D. CONCILIACIÓN REDISEÑADA — 7 días
+   Pendiente desde sesiones anteriores. Modelo: equipos en consignación.
+
+E. PWA + OFFLINE — 5 días
+   - Service worker con cache 30 días
+   - "Cobrar offline" — guarda local, sync al volver
+
+F. FORECASTING & ALERTAS INTELIGENTES — 5 días
+   - Predicción de cierre de mes
+   - Alertas de mora con clientes específicos
+   - Comparativos automáticos
+
+
+8. MÉTRICAS / KPIs SUGERIDOS PARA MEDIR MEJORA
+==============================================
+
+KPI                                       MEDIR                META
+----------------------------------------  -------------------  --------
+Time-to-cobro (segundos por pago)         Telemetría sintética <10s
+Tasa de cobro mensual                     Ya calculado          >85%
+Cobros registrados antes del día 5        Query simple          >70%
+Adopción móvil (% sesiones <1024px)       Vercel Analytics      >40%
+Errores client-side por sesión            Sentry                <0.1
+NPS interno del equipo                    Encuesta trimestral   >8/10
+DAU (Daily Active Users)                  Auth log              Tracked
+
+
+9. ROADMAP TRIMESTRAL SUGERIDO
+==============================
+
+Q1 — PRODUCTIVIDAD OPERACIONAL (URGENTE)
+  ✅ Bulk actions en cobros (v1.5.0)
+  ✅ WhatsApp recordatorio (v1.5.0)
+  ✅ logActivity automático (v1.5.0)
+  ⏳ Cmd+K global search
+  ⏳ Empty states + CTAs
+  ⏳ "Acción del día" en dashboard
+
+Q2 — INTELIGENCIA FINANCIERA
+  ⏳ Forecasting de cobros
+  ⏳ Alertas inteligentes
+  ⏳ Comparativos mes-a-mes
+  ⏳ Reportes PDF
+
+Q3 — COMUNICACIÓN CON CLIENTE
+  ⏳ Cliente portal público
+  ⏳ Recibos digitales auto
+  ⏳ Templates personalizables
+  ⏳ QR codes de pago
+
+Q4 — ESCALABILIDAD
+  ⏳ PWA + offline
+  ⏳ Multi-tenant (otros ISPs como clientes)
+  ⏳ API pública documentada
+  ⏳ Mobile app nativa (opcional)
+
+
+10. RIESGOS A VIGILAR
+=====================
+
+🚨 Sin tests automatizados
+   Cualquier refactor grande puede romper sync de libro diario silenciosamente.
+   ACCIÓN: Implementar Vitest para services + Playwright para E2E de cobros.
+
+🚨 Sin monitoreo de errores en producción
+   Errores en Vercel pasan desapercibidos.
+   ACCIÓN: Integrar Sentry o LogRocket.
+
+🚨 Performance con escala
+   Con 1000+ clientes el client-side filtering empieza a sufrir.
+   ACCIÓN: Mover filtros a servidor + paginación + SQL views materializadas.
+
+🟡 Concentración de owner único
+   Si Sheka pierde acceso a su email, no hay backup operacional.
+   ACCIÓN: Crear cuenta admin secundaria de respaldo.
+
+
+11. DECISIÓN EJECUTIVA SUGERIDA
+==============================
+
+ESTADO: La plataforma está LISTA PARA OPERACIÓN PRODUCTIVA. Datos dentro, equipo puede operar.
+
+LO QUE LA SEPARA DE "BUENA" A "EXCELENTE":
+1. Velocidad operacional (bulk + atajos) — 1 sprint  ✅ Iniciado v1.5.0
+2. Inteligencia accionable (forecasting + alerts) — 2 sprints
+3. Cierre del loop con cliente (portal + recibos) — 3 sprints
+
+PRÓXIMOS 30 DÍAS:
+- Semana 1: Pulido v1.5.0 + Cmd+K
+- Semana 2: Empty states + tour guiado
+- Semana 3: Inicio sistema notificaciones
+- Semana 4: Recibos PDF
+
+
+---
+Documento mantenido en Google Drive · ZOE Net - Documentación Ejecutiva
+Última actualización: 30 abril 2026 · v1.5.0

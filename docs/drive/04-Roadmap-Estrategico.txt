@@ -1,0 +1,262 @@
+ROADMAP ESTRATÉGICO — ZOE NET GESTIÓN
+=====================================
+
+Versión actual: v1.5.0 · 30 abril 2026
+
+
+VISIÓN A 12 MESES
+=================
+
+ZOE Net Gestión pasa de ser una herramienta INTERNA del operador a una
+PLATAFORMA con cliente final integrado, capaz de escalar a múltiples
+ISPs rurales (multi-tenant).
+
+
+HORIZONTE DE EJECUCIÓN
+=====================
+
+Q1 — PRODUCTIVIDAD OPERACIONAL  (en curso · v1.5.x)
+Q2 — INTELIGENCIA FINANCIERA    (mayo-julio)
+Q3 — COMUNICACIÓN CON CLIENTE   (agosto-octubre)
+Q4 — ESCALABILIDAD              (noviembre-enero 2027)
+
+
+─────────────────────────────────────────────
+Q1 — PRODUCTIVIDAD OPERACIONAL  (4 semanas)
+─────────────────────────────────────────────
+
+OBJETIVO: Reducir el TIEMPO POR ACCIÓN a la mitad. Hoy registrar 10 cobros
+toma ~5 min, después de Q1 debería ser ~1 min.
+
+✅ COMPLETADO en v1.5.0:
+   ✓ Bulk pagos en /cobros
+   ✓ Botón WhatsApp recordatorio
+   ✓ logActivity automático en services
+   ✓ Página /historial poblada automáticamente
+
+⏳ PENDIENTE Q1:
+   • Cmd+K — búsqueda global (clientes/cobros/facturas)
+   • Empty states con CTAs ("¿Aún no tienes cobros? Crea el primero")
+   • Card "Acción del día" en Dashboard
+   • Skeleton loaders en lugar de spinners
+   • Atajos j/k para navegar listas
+   • Tooltips contextuales en campos complejos
+
+ENTREGABLES Q1:
+   - v1.6.0 con Cmd+K y empty states
+   - v1.7.0 con dashboard accionable
+
+MÉTRICAS Q1:
+   - Time-to-cobro: <10 segundos por cobro (medido)
+   - 0 confusión sobre "qué hacer hoy"
+   - WhatsApp adoption: >50% de recordatorios via botón
+
+
+─────────────────────────────────────────────
+Q2 — INTELIGENCIA FINANCIERA  (8 semanas)
+─────────────────────────────────────────────
+
+OBJETIVO: La plataforma proactivamente RESPONDE preguntas de negocio en
+vez de solo MOSTRAR datos.
+
+ÉPICAS:
+
+1. FORECASTING DE INGRESOS  (1 semana)
+   - Predicción de cierre de mes basada en patrones históricos
+   - "Si todo se mantiene, recibirás RD$ 51,800 al cierre"
+   - Visualización en Dashboard y /finanzas
+   - Margen de error visible
+
+2. ALERTAS INTELIGENTES  (1 semana)
+   - "Erick Gil debe RD$ 1,500 hace 60 días"
+   - "Maciel siempre paga después del día 20, espera"
+   - "Stock bajo: solo quedan 2 routers nuevos"
+   - "3 instalaciones pendientes desde hace 7 días"
+   - Centro de notificaciones con badge en bell icon
+
+3. COMPARATIVOS AUTOMÁTICOS  (4 días)
+   - "Este mes: -12% vs mes anterior"
+   - "Top 3 clientes que reducen vs aumentan pago"
+   - "Tendencia última 6 meses por categoría"
+   - Chart con drill-down
+
+4. REPORTES EJECUTIVOS PDF  (1 semana)
+   - Resumen mensual ejecutivo (auto-generado)
+   - Estado de cuenta por cliente
+   - Reporte fiscal preparatorio (para contador)
+   - Reporte de mora con aging
+   - Export a Excel adicional
+
+5. WHAT-IF ANALYSIS  (3 días)
+   - "Si Francisco vuelve, +RD$ 1,500/mes recurrente"
+   - "Si pierdes 3 clientes, MRR cae a X"
+   - Simulador interactivo
+
+ENTREGABLES Q2:
+   - v1.8.0: forecasting + alertas
+   - v1.9.0: reportes PDF + Excel
+   - v2.0.0: comparativos + what-if
+
+MÉTRICAS Q2:
+   - >70% de cobros registrados antes del día 5 (vs ~50% hoy)
+   - Mora promedio: <30 días (vs ~60 hoy)
+   - Tasa de cobro: >90% en cualquier mes
+
+
+─────────────────────────────────────────────
+Q3 — COMUNICACIÓN CON CLIENTE  (8 semanas)
+─────────────────────────────────────────────
+
+OBJETIVO: Cerrar el loop con el cliente final. De "el ISP llama por
+WhatsApp manualmente" a "el cliente recibe info y paga sin fricción".
+
+ÉPICAS:
+
+1. RECIBOS DIGITALES PDF  (1 semana)
+   - Generación automática al marcar cobro pagado
+   - Template con marca ZOE Net
+   - Almacenado en Supabase Storage
+   - Botón "Compartir por WhatsApp" en 1 click
+   - Compatible con apps de email del cliente
+
+2. CLIENTE PORTAL PÚBLICO  (2 semanas)
+   - URL única por cliente: /portal/{token}
+   - SIN login (token = identificación)
+   - Muestra: historial de pagos, deuda actual, próxima fecha
+   - Descarga de recibos previos
+   - Botón "Pagar ahora" con QR Banreservas
+   - 100% mobile-first
+
+3. TEMPLATES PERSONALIZABLES  (1 semana)
+   - Configuración de plantillas WhatsApp
+   - Variables: {nombre}, {monto}, {mes}, {fecha}
+   - Tipos: recordatorio, factura, instalación agendada,
+     servicio restablecido, bienvenida
+   - Botón "enviar plantilla" en perfil del cliente
+
+4. EMAIL MARKETING BÁSICO  (1 semana, opcional)
+   - Campañas: "Promoción upgrade a 20 Mbps"
+   - Tracking de aperturas (con Resend ya configurado)
+
+5. AUTOMATIZACIONES  (1 semana)
+   - Recordatorio automático día 28 de cada mes
+   - Aviso de cobro recibido (al cliente)
+   - Confirmación de instalación agendada
+   - Integración con Twilio para SMS opcional
+
+ENTREGABLES Q3:
+   - v2.1.0: recibos digitales
+   - v2.2.0: portal cliente público
+   - v2.3.0: templates + automatizaciones
+
+MÉTRICAS Q3:
+   - >80% recordatorios enviados automáticamente
+   - >30% clientes acceden al portal en su primer mes
+   - Mora reducida en 25%
+   - Recibos PDF emitidos: 100% de pagos
+
+
+─────────────────────────────────────────────
+Q4 — ESCALABILIDAD  (12 semanas)
+─────────────────────────────────────────────
+
+OBJETIVO: Convertir la plataforma en un PRODUCTO SaaS para otros ISPs
+rurales de RD y Caribe.
+
+ÉPICAS:
+
+1. PWA + OFFLINE  (1 semana)
+   - Service worker con cache 30 días
+   - Instalable como app nativa en home screen
+   - "Cobrar offline" — guarda local, sync al reconectar
+   - Crítico para zonas rurales con señal intermitente
+
+2. MULTI-TENANT  (3 semanas)
+   - Una instalación → múltiples ISPs
+   - Aislamiento de datos por tenant
+   - Onboarding de nuevos ISPs en <30 minutos
+   - Branding personalizable (logo, colores)
+
+3. API PÚBLICA DOCUMENTADA  (2 semanas)
+   - REST API con OpenAPI spec
+   - Auth via tokens
+   - Endpoints: clientes, cobros, ventas, métricas
+   - Útil para integraciones externas (Mikrotik, contabilidad)
+
+4. INTEGRACIÓN MIKROTIK  (2 semanas)
+   - API a routers Mikrotik para:
+     · Cortar servicio automático por mora >30 días
+     · Reactivar al confirmar pago
+     · Monitorear consumo de cliente
+   - Reduce trabajo manual del técnico de 100% a 20%
+
+5. APP MÓVIL NATIVA (opcional)  (4 semanas)
+   - React Native con Expo
+   - Cobros, instalaciones, fotos en campo
+   - Push notifications nativas
+   - Login con biometría
+
+6. TESTS AUTOMATIZADOS  (1 semana)
+   - Vitest para servicios críticos
+   - Playwright para E2E del flujo de cobros
+   - CI/CD con tests pre-merge
+
+ENTREGABLES Q4:
+   - v3.0.0: PWA + offline (breaking change menor)
+   - v3.1.0: multi-tenant
+   - v3.2.0: API pública
+   - v3.3.0: integración Mikrotik
+
+MÉTRICAS Q4:
+   - 1+ ISP cliente además de ZOE Net (validación SaaS)
+   - 0% downtime en deploys
+   - Tests coverage >70%
+   - Latency p95 <500ms
+
+
+─────────────────────────────────────────────
+DESPUÉS DE Q4 — FUTURO LEJANO
+─────────────────────────────────────────────
+
+- Marketplace de servicios (clientes contratan upgrades online)
+- Análisis predictivo con ML (probabilidad de churn por cliente)
+- Voice ordering (asistente que registra cobros por voz)
+- Programa de fidelidad y referidos
+- Integración con plataformas de pago automatizado (Tropipay, Azul)
+
+
+─────────────────────────────────────────────
+PRESUPUESTO Y RECURSOS ESTIMADOS
+─────────────────────────────────────────────
+
+Q1 (en curso):     ~40 horas dev → 1 semana FT
+Q2:                ~120 horas dev → 3 semanas FT
+Q3:                ~160 horas dev → 4 semanas FT
+Q4:                ~240 horas dev → 6 semanas FT
+
+INFRAESTRUCTURA mensual estimada:
+- Supabase Pro: $25/mes (cuando crezca data)
+- Vercel Pro: $20/mes (si necesario)
+- Resend (emails): $0-20/mes
+- Sentry (error tracking): $0-26/mes
+- Total: $45-91/mes en máximo
+
+TOTAL ESTIMADO 12 MESES:
+- Dev: ~560 horas
+- Infra: ~$1,000
+
+
+─────────────────────────────────────────────
+DECISIONES PENDIENTES
+─────────────────────────────────────────────
+
+1. ¿Multi-tenant es prioridad o foco interno solamente?
+2. ¿API pública es necesaria o no?
+3. ¿Se monetiza la plataforma a otros ISPs?
+4. ¿App móvil nativa o PWA es suficiente?
+5. ¿Qué presupuesto mensual destinar a marketing/ventas SaaS?
+
+
+---
+Documento mantenido en Google Drive · ZOE Net - Documentación Ejecutiva
+Última actualización: 30 abril 2026 · v1.5.0

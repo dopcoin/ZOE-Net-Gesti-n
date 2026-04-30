@@ -1,0 +1,321 @@
+MANUAL DE USUARIO — ZOE NET GESTIÓN
+====================================
+
+Versión: 1.5.0 · Última actualización: 30 abril 2026
+
+
+ÍNDICE
+======
+
+1.  Acceso a la plataforma
+2.  Estructura del menú
+3.  Tareas más comunes
+    3.1 Registrar un cobro mensual
+    3.2 Registrar pagos masivos (varios clientes a la vez)
+    3.3 Recordar pago a un cliente por WhatsApp
+    3.4 Crear un cliente nuevo
+    3.5 Marcar cliente como retirado
+    3.6 Aplicar remisión por cortes de servicio
+    3.7 Registrar una venta
+    3.8 Crear una factura
+    3.9 Registrar un gasto
+    3.10 Generar gastos recurrentes (nóminas)
+    3.11 Liquidar un producto del inventario
+    3.12 Subir fotos a una instalación
+4.  Estados de cobros — guía rápida
+5.  Sistema de roles
+6.  Atajos de teclado
+
+
+1. ACCESO A LA PLATAFORMA
+=========================
+
+URL: el dominio de Vercel (consulta con el owner)
+Login: tu email + password configurado por el admin
+
+Si pierdes acceso:
+- Contacta al owner: dopcoinrd@gmail.com
+
+
+2. ESTRUCTURA DEL MENÚ
+======================
+
+El menú lateral está agrupado en 6 secciones:
+
+📊 RESUMEN
+   - Dashboard: vista general del día
+   - Finanzas: KPIs financieros, MRR, aging
+   - Reportes: análisis mensual
+
+👥 OPERACIONES
+   - Clientes: lista de clientes
+   - Instalaciones: agendar y dar seguimiento
+   - Tareas: pendientes del equipo
+
+💰 VENTAS & COBROS
+   - Cobros: pagos mensuales
+   - Facturas: emisión formal
+   - Ventas: productos vendidos
+   - Revendedores: socios externos
+
+📦 INVENTARIO
+   - Inventario: productos
+   - Conciliación: equipos en consignación
+
+📒 CONTABILIDAD
+   - Libro Diario: entradas y salidas
+   - Gastos: nóminas, viáticos, mantenimientos
+
+⚙ SISTEMA
+   - Equipo: usuarios del sistema
+   - Historial: auditoría (solo admin)
+
+
+3. TAREAS MÁS COMUNES
+=====================
+
+3.1 REGISTRAR UN COBRO MENSUAL
+------------------------------
+
+OPCIÓN A — Cliente individual (rápido):
+1. Menú → Cobros
+2. Selecciona el mes en el navegador (◀ ▶)
+3. Encuentra al cliente en la lista
+4. Click "Pagar" (botón verde)
+   → automáticamente: monto = mensualidad, tipo = efectivo, recibido = Rodeo
+5. Listo.
+
+OPCIÓN B — Con detalles (transferencia, monto distinto, etc.):
+1. Menú → Cobros → mes correcto
+2. Click "Detalle" en el cliente
+3. Completa: estado, monto, tipo de pago, recibido por
+4. Si es transferencia: pon fecha del depósito
+5. Click "Guardar"
+
+
+3.2 REGISTRAR PAGOS MASIVOS (varios clientes a la vez)
+------------------------------------------------------
+
+Usa esto cuando 5+ clientes pagan igual.
+
+1. Menú → Cobros → mes correcto
+2. Click el checkbox de cada cliente que pagó
+   (alternativa: click el checkbox del header → selecciona todos los pendientes/mora)
+3. Aparece arriba una barra azul: "X seleccionados · Total a cobrar: RD$ Y"
+4. Click "✓ Marcar todos como pagados"
+5. Modal: elige tipo de pago (efectivo/transferencia) y "Recibido por"
+6. Click "Confirmar X pagos"
+
+Resultado: todos quedan marcados pagados + entradas creadas en el Libro Diario.
+
+
+3.3 RECORDAR PAGO A UN CLIENTE POR WHATSAPP
+-------------------------------------------
+
+1. Menú → Cobros → mes correcto
+2. Encuentra al cliente con cobro pendiente o en mora
+3. Click el ícono verde de WhatsApp (junto a "Detalle")
+4. Se abre WhatsApp Web/app con un mensaje pre-armado
+5. Ajusta el texto si quieres → envía
+
+El mensaje incluye automáticamente: nombre del cliente, mes, monto y mensaje
+profesional con marca ZOE Net.
+
+
+3.4 CREAR UN CLIENTE NUEVO
+--------------------------
+
+1. Menú → Clientes
+2. Click "+ Nuevo Cliente"
+3. Tab GENERAL (lo mínimo):
+   - Nombre y apellido (obligatorios)
+   - Localidad (Higua, Rodeo o Villa Real)
+   - Monto mensual (ej. 1500)
+   - Estado: "Activo"
+   - Medio de pago: Efectivo / Transferencia
+   - Fecha de inicio: cuando se conecta
+4. Tab TÉCNICO (opcional, llenar cuando se instale):
+   - Plan (ej. "10 Mbps")
+   - Nombre de red, password router/antena
+   - IP asignada
+   - Coordenadas GPS
+5. Click "Crear"
+
+Si el cliente es becado:
+- Tab General → marca "Cliente Becado" → opcionalmente describe el motivo
+
+
+3.5 MARCAR CLIENTE COMO RETIRADO
+--------------------------------
+
+1. Menú → Clientes → encuentra al cliente
+2. Click el ícono de editar
+3. Cambia "Estado" a "Suspendido" (si dejó de pagar) o "Inactivo" (se mudó/cambió)
+4. Aparece automáticamente "Fecha de retiro" con fecha de hoy
+5. Ajústala si fue otra fecha
+6. Click "Guardar Cambios"
+
+Resultado: el cliente NO aparece más en la lista de Cobros para nuevos meses.
+Sus cobros históricos siguen visibles en Finanzas y reportes.
+
+
+3.6 APLICAR REMISIÓN POR CORTES DE SERVICIO
+-------------------------------------------
+
+Cuando hubo cortes y le perdonas el cobro de ese mes (parcial o total):
+
+1. Menú → Cobros → mes correcto
+2. Click "Remitir ▼" en el cliente
+3. Elige el porcentaje:
+   - 20% → cliente paga 80%
+   - 30% → cliente paga 70%
+   - 50% → cliente paga la mitad
+   - 100% → cliente NO paga ese mes
+4. Confirma con el monto que muestra el sistema
+
+Resultado: aparece como "Remitido" (badge cyan) o "Parcial" (azul) según el %.
+NO afecta los meses futuros — solo este mes específico.
+
+
+3.7 REGISTRAR UNA VENTA
+-----------------------
+
+1. Menú → Ventas → "+ Nueva Venta"
+2. Selecciona el producto
+3. Tipo: Directa (cliente) o Por Revendedor
+4. Si es directa: elige cliente o "Cliente Genérico"
+5. Si es revendedor: elige revendedor
+6. Cantidad y precio (auto-llena con precio de venta)
+7. Estado: Completada (recomendado)
+8. Click "Guardar"
+
+Resultado: se descuenta del stock + entra al libro diario como ingreso.
+
+
+3.8 CREAR UNA FACTURA
+---------------------
+
+1. Menú → Facturas → "+ Nueva Factura"
+2. Cliente, fecha (default: hoy)
+3. Items:
+   - Click "Desde inventario" para elegir producto del stock
+   - O "+ Línea libre" para texto manual
+4. Marca/desmarca ITBIS (toggle a la derecha del campo)
+5. Aplica descuento si corresponde
+6. Estado:
+   - Pendiente: si aún no pagó
+   - Pagada: si ya cobraste
+7. Click "Crear Factura"
+
+Si está PAGADA: descuenta stock + entra al libro diario automáticamente.
+
+
+3.9 REGISTRAR UN GASTO
+----------------------
+
+1. Menú → Gastos → "+ Nuevo Gasto"
+2. Selecciona categoría visual:
+   💼 Nóminas / 🔧 Mantenimientos / ✈ Viáticos / ⚡ Servicios /
+   📦 Equipos / 🛍 Suministros / ❓ Otros
+3. Descripción y monto
+4. Fecha (default: hoy)
+5. Método de pago, beneficiario, referencia (opcional)
+6. Si es un gasto que se repite cada mes:
+   - Toggle "Gasto recurrente" → frecuencia
+7. Click "Registrar Gasto"
+
+
+3.10 GENERAR GASTOS RECURRENTES (NÓMINAS)
+-----------------------------------------
+
+Una vez tienes gastos marcados como recurrentes, cada mes:
+
+1. Menú → Gastos
+2. Arriba aparece botón "🔄 Generar recurrentes"
+3. Click → muestra los gastos que se generarán (los recurrentes que aún
+   NO existen este mes)
+4. Confirma → se crean todos automáticamente con fecha de hoy
+
+Útil para: Pago Kendry, Pago Camila, internet oficina, alquileres, etc.
+
+
+3.11 LIQUIDAR UN PRODUCTO DEL INVENTARIO
+----------------------------------------
+
+Cuando un producto se vendió todo o ya no se ofrece:
+
+1. Menú → Inventario
+2. Click "Liquidar" en la fila del producto
+3. Confirma
+
+Resultado:
+- Stock = 0
+- Activo = false
+- Sale del cálculo de "Valor total del inventario"
+- Sale de las alertas de stock bajo
+- Mantiene el histórico
+
+Para reactivarlo (si recibes más stock): edita el producto → pon stock + marca "Activo".
+
+
+3.12 SUBIR FOTOS A UNA INSTALACIÓN
+----------------------------------
+
+1. Menú → Instalaciones
+2. Edita la instalación (tiene que estar creada ya)
+3. Baja a "Fotos de seguimiento"
+4. Click "Subir fotos" o el cuadrito "+"
+5. Selecciona 1+ imágenes (max 10 fotos, 5MB cada una)
+6. Las fotos aparecen en grid con preview
+7. Click foto = ver tamaño completo
+8. Hover + ícono basura = eliminar
+
+
+4. ESTADOS DE COBROS — GUÍA RÁPIDA
+==================================
+
+PAGADO     ✅ Verde    Cliente pagó completo. Entra al libro diario.
+PENDIENTE  ⏳ Amarillo No ha pagado todavía. Default al inicio del mes.
+MORA       ⚠ Rojo    Cliente atrasado, ya debió pagar hace tiempo.
+PARCIAL    🔵 Azul    Pago parcial (ej. abonó RD$800 de 1500).
+EXONERADO  🟣 Morado  Cliente becado. No paga (permanente).
+REMITIDO   🌀 Cyan    Le perdonaste el pago ESTE mes (cortes/cortesía).
+
+
+5. SISTEMA DE ROLES
+==================
+
+ADMIN
+  Acceso total a todas las páginas y acciones.
+  Acceso al Historial.
+
+FINANCIERO
+  Cobros, Facturas, Ventas, Libro Diario, Finanzas, Reportes, Gastos.
+  Inventario en modo solo lectura.
+
+ADMINISTRATIVO
+  Inventario completo, Conciliación, Revendedores, Equipo.
+  Tareas, Gastos.
+
+SOPORTE
+  Clientes, Instalaciones, Tareas.
+  Inventario en modo solo lectura.
+
+
+6. ATAJOS DE TECLADO
+====================
+
+GLOBALES (con modal cerrado):
+   Esc          Cerrar cualquier modal abierto
+
+EN MODAL DE COBROS:
+   ←  →         Navegar al cliente anterior/siguiente
+   Esc          Cerrar modal
+
+EN BÚSQUEDAS:
+   Click en el input → escribe → filtra en vivo
+
+
+---
+Documento mantenido en Google Drive · ZOE Net - Documentación Ejecutiva
+Para sugerencias o reportar errores: dopcoinrd@gmail.com
