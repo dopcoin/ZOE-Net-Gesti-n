@@ -243,20 +243,45 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
     try {
       const payload = buildPayload();
 
+      // Helper: handler de error con retry sin fecha_retiro si la columna no existe
+      const handleSaveError = async (
+        result: Awaited<ReturnType<typeof createCliente>>,
+        opName: 'create' | 'update'
+      ): Promise<boolean> => {
+        if (!result.error) return true;
+        const msg = (result.error.message || '').toLowerCase();
+        const isFechaRetiroMissing = msg.includes('fecha_retiro') && (result.error.code === 'PGRST204' || msg.includes('schema cache'));
+        if (isFechaRetiroMissing) {
+          // Retry sin fecha_retiro
+          const retryPayload = { ...payload };
+          delete (retryPayload as Record<string, unknown>).fecha_retiro;
+          const retry = opName === 'create'
+            ? await createCliente(retryPayload)
+            : await updateCliente(selectedCliente!.id, retryPayload);
+          if (retry.error) {
+            toast.error(getErrorMessage(retry.error));
+            return false;
+          }
+          toast.warning(
+            'Cliente guardado, pero la fecha de retiro no se guardó. Ejecuta el SQL: supabase/migrations/EJECUTAR_AHORA.sql',
+            { duration: 8000 }
+          );
+          return true;
+        }
+        toast.error(getErrorMessage(result.error));
+        return false;
+      };
+
       if (modalMode === 'create') {
         const result = await createCliente(payload);
-        if (result.error) {
-          toast.error(getErrorMessage(result.error));
-          return;
-        }
-        toast.success('Cliente creado exitosamente');
+        const ok = await handleSaveError(result, 'create');
+        if (!ok) return;
+        if (!result.error) toast.success('Cliente creado exitosamente');
       } else if (selectedCliente) {
         const result = await updateCliente(selectedCliente.id, payload);
-        if (result.error) {
-          toast.error(getErrorMessage(result.error));
-          return;
-        }
-        toast.success('Cliente actualizado exitosamente');
+        const ok = await handleSaveError(result, 'update');
+        if (!ok) return;
+        if (!result.error) toast.success('Cliente actualizado exitosamente');
       }
       closeModal();
       router.refresh();

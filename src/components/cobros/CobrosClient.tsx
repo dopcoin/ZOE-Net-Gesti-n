@@ -9,6 +9,16 @@ import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2, Plus, Banknote, FileText, Wallet, ArrowRightLeft } from 'lucide-react';
 import type { Cliente, Cobro, EstadoCobro, TipoCobro } from '@/types';
 
+// Etiquetas visuales para los estados de cobro (en BD se guardan como en el tipo)
+const ESTADO_LABEL: Record<EstadoCobro, string> = {
+  pagado: 'Pagado',
+  pendiente: 'Pendiente',
+  mora: 'Mora',
+  exonerado: 'Exonerado',
+  parcial: 'Parcial',
+  condonado: 'Remitido',
+};
+
 interface Props {
   clientes: Cliente[];
   cobros: Cobro[];
@@ -53,6 +63,59 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
   const [historialCliente, setHistorialCliente] = useState<Cliente | null>(null);
   const [historialCobros, setHistorialCobros] = useState<Cobro[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
+
+  // Menú de remisión (dropdown) por fila
+  const [remisionMenuFor, setRemisionMenuFor] = useState<string | null>(null);
+
+  // Aplica una remisión con porcentaje (20/30/50/100)
+  // 100% → cliente no paga (estado condonado, monto 0)
+  // <100% → pago parcial (estado parcial, monto = mensual × (1 - %))
+  async function aplicarRemision(cc: ClienteCobro, porcentajeRemision: number) {
+    setRemisionMenuFor(null);
+    const mensual = cc.cliente.monto_mensual;
+    const montoARemitir = mensual * (porcentajeRemision / 100);
+    const montoAPagar = Math.max(0, mensual - montoARemitir);
+
+    const isTotal = porcentajeRemision >= 100;
+    const estado: EstadoCobro = isTotal ? 'condonado' : 'parcial';
+    const nota = isTotal
+      ? `Remisión total (100%) por cortes/falla de servicio`
+      : `Remisión ${porcentajeRemision}% (descuento RD$${montoARemitir.toFixed(2)}) por cortes/falla`;
+
+    if (!confirm(
+      isTotal
+        ? `¿Remitir totalmente (100%) el cobro de ${cc.cliente.nombre}?\nEl cliente NO paga este mes.`
+        : `¿Remitir ${porcentajeRemision}% a ${cc.cliente.nombre}?\n\nMensual: RD$${mensual.toFixed(2)}\nDescuento: RD$${montoARemitir.toFixed(2)} (${porcentajeRemision}%)\nA pagar: RD$${montoAPagar.toFixed(2)}`
+    )) return;
+
+    setLoading(`condonar-${cc.cliente.id}`);
+    try {
+      await upsertCobro(
+        cc.cliente.id,
+        estado,
+        montoAPagar,
+        null,
+        nota,
+        null,
+        cc.cobro?.id,
+      );
+      toast.success(isTotal ? 'Cobro remitido al 100%' : `Remisión ${porcentajeRemision}% aplicada`);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Detectar el constraint violation de 'condonado'
+      if (msg.includes('cobros_estado_check') || msg.includes('check constraint')) {
+        toast.error(
+          'La BD aún no acepta el estado "condonado". Ejecuta el SQL pendiente: supabase/migrations/EJECUTAR_AHORA.sql',
+          { duration: 8000 }
+        );
+      } else {
+        toast.error(`Error al aplicar la remisión: ${msg}`);
+      }
+    } finally {
+      setLoading(null);
+    }
+  }
 
   const localidades = useMemo(() => {
     const locs = clientes.map((c) => c.localidad).filter((l): l is string => !!l);
@@ -690,7 +753,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       {/* Cobros List */}
       <div className="card overflow-hidden">
         {/* Table Header */}
-        <div className="hidden md:grid grid-cols-[1fr_120px_120px_120px_180px] gap-4 px-4 py-3 bg-[#0A0F1E] border-b border-[#1F2937] text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div className="hidden md:grid grid-cols-[1.5fr_110px_110px_120px_300px] gap-4 px-4 py-3 bg-[#0A0F1E] border-b border-[#1F2937] text-xs font-medium text-gray-500 uppercase tracking-wider">
           <span>Cliente</span>
           <span>Plan</span>
           <span>Monto</span>
@@ -707,7 +770,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
             {filtered.map((cc) => (
               <div
                 key={cc.cliente.id}
-                className="grid grid-cols-1 md:grid-cols-[1fr_120px_120px_120px_180px] gap-2 md:gap-4 items-center px-4 py-3 hover:bg-[#1C2333] transition-colors"
+                className="grid grid-cols-1 md:grid-cols-[1.5fr_110px_110px_120px_300px] gap-2 md:gap-4 items-center px-4 py-3 hover:bg-[#1C2333] transition-colors"
               >
                 {/* Client name */}
                 <div>
@@ -734,8 +797,8 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
 
                 {/* Estado badge */}
                 <div>
-                  <span className={`badge ${estadoCobroColor(cc.estado)}`}>
-                    {cc.estado}
+                  <span className={`badge ${estadoCobroColor(cc.estado)} whitespace-nowrap`}>
+                    {ESTADO_LABEL[cc.estado] ?? cc.estado}
                   </span>
                 </div>
 
@@ -759,21 +822,69 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                         >
                           {loading === `pay-${cc.cliente.id}` ? '...' : 'Pagar'}
                         </button>
-                        <button
-                          onClick={() => {
-                            if (!confirm(`¿Condonar el cobro de ${cc.cliente.nombre} para este mes?\n\nNo se le cobrará por servicio defectuoso, cortes o cortesía.\nNo afecta meses futuros.`)) return;
-                            setLoading(`condonar-${cc.cliente.id}`);
-                            upsertCobro(cc.cliente.id, 'condonado', 0, null, 'Condonado por cortes/falla de servicio', null, cc.cobro?.id)
-                              .then(() => { toast.success('Cobro condonado'); router.refresh(); })
-                              .catch(() => toast.error('Error al condonar'))
-                              .finally(() => setLoading(null));
-                          }}
-                          disabled={loading === `condonar-${cc.cliente.id}`}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors disabled:opacity-50"
-                          title="No cobrar este mes (cortes/falla de servicio)"
-                        >
-                          {loading === `condonar-${cc.cliente.id}` ? '...' : 'Condonar'}
-                        </button>
+                        {/* Botón Remitir con dropdown de porcentajes */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setRemisionMenuFor(remisionMenuFor === cc.cliente.id ? null : cc.cliente.id)}
+                            disabled={loading === `condonar-${cc.cliente.id}`}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                            title="Remitir cobro (cortes/falla de servicio)"
+                          >
+                            {loading === `condonar-${cc.cliente.id}` ? '...' : (
+                              <>
+                                Remitir
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                              </>
+                            )}
+                          </button>
+
+                          {remisionMenuFor === cc.cliente.id && (
+                            <>
+                              {/* Backdrop para cerrar al hacer click fuera */}
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setRemisionMenuFor(null)}
+                              />
+                              <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-lg bg-[#1C2333] border border-cyan-500/30 shadow-2xl overflow-hidden animate-fade-in">
+                                <div className="px-3 py-2 bg-cyan-500/10 border-b border-cyan-500/20">
+                                  <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                                    Remitir descuento
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 mt-0.5">
+                                    Mensual: {formatCurrency(cc.cliente.monto_mensual)}
+                                  </div>
+                                </div>
+                                {[20, 30, 50, 100].map((pct) => {
+                                  const descuento = cc.cliente.monto_mensual * (pct / 100);
+                                  const aPagar = cc.cliente.monto_mensual - descuento;
+                                  return (
+                                    <button
+                                      key={pct}
+                                      onClick={() => aplicarRemision(cc, pct)}
+                                      className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-cyan-500/10 transition-colors border-b border-[#1F2937] last:border-b-0"
+                                    >
+                                      <div>
+                                        <div className="text-sm font-semibold text-cyan-400">
+                                          {pct}%
+                                          {pct === 100 && <span className="ml-1 text-[10px] font-normal opacity-70">(total)</span>}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500">
+                                          Descuento {formatCurrency(descuento)}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-[10px] text-gray-500">Paga</div>
+                                        <div className="text-xs font-bold font-mono tabular text-gray-200">
+                                          {formatCurrency(aPagar)}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                         <button
                           onClick={() => handleQuickMora(cc)}
                           disabled={loading === `mora-${cc.cliente.id}`}
@@ -844,13 +955,13 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                   <option value="parcial">🔵 Parcial (pago reducido)</option>
                   <option value="pendiente">⏳ Pendiente</option>
                   <option value="mora">⚠️ Mora</option>
-                  <option value="condonado">🌀 Condonado (cortes/falla servicio)</option>
+                  <option value="condonado">🌀 Remitido (cortes/falla servicio)</option>
                   <option value="exonerado">🎓 Exonerado (becado)</option>
                 </select>
                 {formEstado === 'condonado' && (
                   <p className="text-[11px] text-cyan-400 mt-1.5 flex items-start gap-1">
                     <span>💡</span>
-                    <span>El cliente NO paga este mes por motivos de servicio (cortes/fallas). No afecta su estado ni meses futuros.</span>
+                    <span>Remisión total: el cliente NO paga este mes por cortes o falla de servicio. Para remisión parcial (20/30/50%) usa el botón &quot;Remitir&quot; en la fila o cambia el estado a &quot;Parcial&quot; con el monto reducido.</span>
                   </p>
                 )}
               </div>

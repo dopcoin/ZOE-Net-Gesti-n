@@ -6,6 +6,35 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.5] — 2026-04-29
+
+### Added
+- **Migración consolidada `supabase/migrations/EJECUTAR_AHORA.sql`** que aplica de un golpe TODAS las pendientes:
+  - `clientes.fecha_retiro` (v1.3.1)
+  - `cobros.estado` acepta `'condonado'` (v1.3.2)
+  - `facturas.fecha`, `instalaciones.fotos/metodo_pago/recibido_en`, `libro_diario.origen_id/origen_tipo/metodo_pago/recibido_en`, `cobros.recibido_por`
+  - RLS policy `ver_libro_diario` y bucket de Storage `instalacion-fotos`
+  - **Idempotente** — re-ejecutable sin riesgo
+  - Verificación al final con `RAISE NOTICE` confirmando cada item
+
+### Fixed
+- **Error oculto al guardar cliente con fecha de retiro**: si la columna no existe en BD, el código ahora hace retry sin el campo y muestra un warning claro indicando qué SQL ejecutar — antes mostraba un PGRST204 críptico.
+- **Error oculto al marcar Remitir/Condonar**: si el constraint no acepta el estado, ahora se muestra un mensaje específico apuntando al SQL de migración pendiente.
+
+## [1.3.4] — 2026-04-29
+
+### Changed
+- **"Condonar" renombrado a "Remitir/Remisión"** (terminología financiera correcta).
+  - El estado interno en BD sigue siendo `condonado` (compatibilidad con datos existentes), pero la UI muestra siempre "Remitido" / "Remisión".
+- **Botón "Remitir" ahora es un dropdown** con porcentajes preestablecidos:
+  - **20%** → cliente paga 80% (estado `parcial` con descuento aplicado)
+  - **30%** → cliente paga 70%
+  - **50%** → cliente paga 50%
+  - **100%** → cliente NO paga (estado `condonado`)
+  - Cada opción muestra el descuento y monto a pagar antes de confirmar
+- **Layout del row de cobros corregido**: ancho de columna de acciones ampliado de 180px a 300px → el badge "Pendiente" ya no queda tapado por los botones.
+- **`whitespace-nowrap`** agregado al badge de estado para evitar que se rompa en 2 líneas.
+
 ## [1.3.3] — 2026-04-29
 
 ### Added
