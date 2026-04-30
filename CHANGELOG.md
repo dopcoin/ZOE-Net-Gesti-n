@@ -6,6 +6,19 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.3] — 2026-04-29
+
+### Added
+- **Desglose de recaudación por tipo de pago** en `/cobros`:
+  - Card visual con barras de progreso por categoría: Efectivo, Transferencia, Cheque, Tarjeta, Otro
+  - Cada barra muestra monto, % del total y total de la categoría
+  - Detección automática de cheques aunque estén guardados como `transferencia` (cuando `recibido_por` contiene "cheque")
+- **Desglose de recaudación por receptor** en `/cobros`:
+  - Quién recolectó cada peso (Rodeo, Oscar, DopCoin Cheque, etc.)
+  - Ordenado por monto descendente
+  - Muestra monto + % del total
+- Útil para conciliación bancaria y rendición de cuentas con cobradores.
+
 ## [1.3.2] — 2026-04-29
 
 ### Added

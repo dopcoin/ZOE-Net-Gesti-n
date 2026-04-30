@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { formatCurrency, estadoCobroColor, meses } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, CreditCard, X, DollarSign, TrendingUp, Users, AlertTriangle, History, Trash2, Plus, Banknote, FileText, Wallet, ArrowRightLeft } from 'lucide-react';
 import type { Cliente, Cobro, EstadoCobro, TipoCobro } from '@/types';
 
 interface Props {
@@ -119,7 +119,40 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     // Exonerados y condonados son "resueltos" — no cuentan para tasa de cobro
     const cobrables = total - exonerados - condonados;
     const tasaCobro = cobrables > 0 ? Math.round(((pagados + parciales) / cobrables) * 100) : 0;
-    return { total, pagados, parciales, exonerados, condonados, enMora, totalRecaudado, porCobrar, tasaCobro, cobrables };
+
+    // === Desglose por tipo de pago ===
+    // Detecta cheques aunque vengan como tipo_pago='transferencia' (legacy del sheet)
+    // mediante el texto "cheque" en recibido_por.
+    const porTipoPago: Record<'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'otro', number> = {
+      efectivo: 0, transferencia: 0, cheque: 0, tarjeta: 0, otro: 0,
+    };
+    const porReceptor: Record<string, number> = {};
+    clientesCobros.forEach((cc) => {
+      if (!cc.cobro || (cc.estado !== 'pagado' && cc.estado !== 'parcial')) return;
+      const monto = cc.cobro.monto ?? 0;
+      const tp = (cc.cobro.tipo_pago ?? 'otro') as keyof typeof porTipoPago;
+      const recibidoPor = (cc.cobro.recibido_por ?? '').trim();
+      const recibidoLower = recibidoPor.toLowerCase();
+
+      // Cheque detection: si recibido_por dice "cheque", se reclasifica a cheque
+      if (recibidoLower.includes('cheque')) {
+        porTipoPago.cheque += monto;
+      } else if (porTipoPago[tp] !== undefined) {
+        porTipoPago[tp] += monto;
+      } else {
+        porTipoPago.otro += monto;
+      }
+
+      // Por receptor (quien recolectó)
+      const key = recibidoPor || '— Sin especificar —';
+      porReceptor[key] = (porReceptor[key] ?? 0) + monto;
+    });
+
+    return {
+      total, pagados, parciales, exonerados, condonados, enMora,
+      totalRecaudado, porCobrar, tasaCobro, cobrables,
+      porTipoPago, porReceptor,
+    };
   }, [clientesCobros]);
 
   function prevMonth() {
@@ -447,6 +480,101 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
           <div className="stat-value">{stats.tasaCobro}%</div>
         </div>
       </div>
+
+      {/* Recaudación por tipo de pago + receptor */}
+      {stats.totalRecaudado > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Por tipo de pago */}
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Wallet size={16} className="text-blue-400" />
+                <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">Por tipo de pago</h3>
+              </div>
+              <span className="text-xs text-gray-500">
+                {meses[currentMonth - 1]} {currentYear}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {([
+                { key: 'efectivo' as const,      label: 'Efectivo',      icon: Banknote,       bg: 'bg-emerald-500/10', text: 'text-emerald-400', bar: 'bg-emerald-500' },
+                { key: 'transferencia' as const, label: 'Transferencia', icon: ArrowRightLeft, bg: 'bg-blue-500/10',    text: 'text-blue-400',    bar: 'bg-blue-500' },
+                { key: 'cheque' as const,        label: 'Cheque',        icon: FileText,       bg: 'bg-purple-500/10',  text: 'text-purple-400',  bar: 'bg-purple-500' },
+                { key: 'tarjeta' as const,       label: 'Tarjeta',       icon: CreditCard,     bg: 'bg-cyan-500/10',    text: 'text-cyan-400',    bar: 'bg-cyan-500' },
+                { key: 'otro' as const,          label: 'Otro',          icon: DollarSign,     bg: 'bg-gray-500/10',    text: 'text-gray-400',    bar: 'bg-gray-500' },
+              ]).map((tp) => {
+                const monto = stats.porTipoPago[tp.key];
+                const pct = stats.totalRecaudado > 0 ? (monto / stats.totalRecaudado) * 100 : 0;
+                if (monto === 0 && tp.key !== 'efectivo' && tp.key !== 'transferencia') return null;
+                const Icon = tp.icon;
+                return (
+                  <div key={tp.key} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`p-1.5 rounded ${tp.bg} flex-shrink-0`}>
+                          <Icon size={12} className={tp.text} />
+                        </div>
+                        <span className="text-sm text-gray-300">{tp.label}</span>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className={`text-sm font-bold font-mono tabular ${tp.text}`}>
+                          {formatCurrency(monto)}
+                        </span>
+                        <span className="text-[10px] text-gray-500 ml-2 tabular">{pct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-[#1C2333] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${tp.bar}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t border-[#1F2937] flex items-center justify-between">
+              <span className="text-sm text-gray-400">Total recaudado</span>
+              <span className="text-base font-bold font-mono tabular text-white">{formatCurrency(stats.totalRecaudado)}</span>
+            </div>
+          </div>
+
+          {/* Por receptor */}
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-emerald-400" />
+                <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">Por receptor</h3>
+              </div>
+              <span className="text-xs text-gray-500">Quien recolectó</span>
+            </div>
+            <div className="space-y-2 max-h-[260px] overflow-y-auto">
+              {Object.entries(stats.porReceptor)
+                .sort((a, b) => b[1] - a[1])
+                .map(([receptor, monto]) => {
+                  const pct = stats.totalRecaudado > 0 ? (monto / stats.totalRecaudado) * 100 : 0;
+                  return (
+                    <div key={receptor} className="flex items-center justify-between p-2 rounded-lg bg-[#1C2333]/50 border border-[#1F2937]">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[10px] font-bold text-emerald-400 flex-shrink-0">
+                          {receptor.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-sm text-gray-200 truncate">{receptor}</span>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <div className="text-sm font-bold font-mono tabular text-emerald-400">{formatCurrency(monto)}</div>
+                        <div className="text-[10px] text-gray-500 tabular">{pct.toFixed(0)}%</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              {Object.keys(stats.porReceptor).length === 0 && (
+                <div className="text-center text-sm text-gray-500 py-6">Sin pagos registrados</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Month Navigation + Search */}
       <div className="card p-4 space-y-3">
