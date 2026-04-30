@@ -220,6 +220,9 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
       fotos: form.fotos,
     };
 
+    // Determinar el ID de la instalación (existente o recién creada)
+    let instalacionId: string | null = null;
+
     if (editing) {
       const result = await updateInstalacion(editing.id, payload);
       if (result.error) {
@@ -228,16 +231,7 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         return;
       }
       toast.success('Instalación actualizada');
-      const eraYaPagado = editing.estado_cobro === 'pagado';
-      if (form.estado_cobro === 'pagado' && !eraYaPagado && form.costo > 0) {
-        // Transición a pagado → crear entrada
-        const clienteObj = clientes.find((c) => c.id === form.cliente_id);
-        const nombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
-        await registrarEnLibroDiario(editing.id, form.tipo, form.costo, nombre);
-      } else if (form.estado_cobro !== 'pagado' && eraYaPagado) {
-        // Revertido → eliminar entrada
-        await eliminarDeLibroDiario(editing.id);
-      }
+      instalacionId = editing.id;
     } else {
       const result = await createInstalacion(payload);
       if (result.error) {
@@ -246,12 +240,22 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
         return;
       }
       toast.success('Instalación creada');
-      if (form.estado_cobro === 'pagado' && form.costo > 0 && result.data?.id) {
+      instalacionId = result.data?.id ?? null;
+    }
+
+    // SYNC robusto con libro_diario:
+    // 1. SIEMPRE eliminar entradas viejas de esta instalación (limpieza)
+    // 2. Si está PAGADO y tiene costo > 0 → crear entrada nueva con datos actuales
+    // Esto garantiza que pendiente/sin_costo NUNCA aparezca en libro_diario.
+    if (instalacionId) {
+      await eliminarDeLibroDiario(instalacionId);
+      if (form.estado_cobro === 'pagado' && form.costo > 0) {
         const clienteObj = clientes.find((c) => c.id === form.cliente_id);
         const nombre = clienteObj ? `${clienteObj.nombre} ${clienteObj.apellido}` : 'Cliente';
-        await registrarEnLibroDiario(result.data.id, form.tipo, form.costo, nombre);
+        await registrarEnLibroDiario(instalacionId, form.tipo, form.costo, nombre);
       }
     }
+
     setShowModal(false);
     router.refresh();
     setLoading(false);
@@ -535,11 +539,24 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                       className="input"
                     >
                       <option value="sin_costo">Sin costo</option>
-                      <option value="pendiente">Pendiente de pago</option>
-                      <option value="pagado">Pagado</option>
+                      <option value="pendiente">⏳ Pendiente de pago</option>
+                      <option value="pagado">✅ Pagado</option>
                     </select>
                   </div>
                 </div>
+                {/* Info según estado del cobro */}
+                {form.estado_cobro === 'pendiente' && form.costo > 0 && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-yellow-500/5 border border-yellow-500/20 text-[11px] text-yellow-400/90 flex items-start gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Este monto <strong>NO se contará como ingreso</strong> hasta que cambies el estado a &quot;Pagado&quot;.</span>
+                  </div>
+                )}
+                {form.estado_cobro === 'pagado' && form.costo > 0 && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-400/90 flex items-start gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Al guardar, se creará una entrada en el <strong>Libro Diario</strong> como ingreso del mes.</span>
+                  </div>
+                )}
 
                 {form.estado_cobro !== 'sin_costo' && (
                   <div className="mt-3">

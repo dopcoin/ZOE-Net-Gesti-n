@@ -6,6 +6,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-04-29
+
+### Fixed
+- **Sincronización robusta entre Instalaciones y Libro Diario**: la lógica anterior solo creaba/eliminaba entradas en transiciones (pagado↔no pagado). Si editabas una instalación que ya estaba pagada y le cambiabas el costo, la entrada en libro diario quedaba con el monto VIEJO.
+  - Ahora al guardar una instalación: SIEMPRE se eliminan entradas previas vinculadas y se recrea SOLO si está `pagado` con `costo > 0`. Esto garantiza que pendientes/sin_costo NUNCA aparezcan como ingresos.
+- Aclaración visual en el form de instalaciones:
+  - Si estado del cobro es **"Pendiente"**: aviso amarillo *"Este monto NO se contará como ingreso hasta que cambies el estado a Pagado"*.
+  - Si estado del cobro es **"Pagado"**: aviso verde *"Al guardar, se creará una entrada en el Libro Diario como ingreso del mes"*.
+
 ## [1.4.1] — 2026-04-29
 
 ### Fixed
