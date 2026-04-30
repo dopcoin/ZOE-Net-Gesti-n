@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
@@ -375,7 +375,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     }
   }
 
-  function openModal(cc: ClienteCobro) {
+  function loadFormFromClienteCobro(cc: ClienteCobro) {
     setModalData({ cliente: cc.cliente, cobro: cc.cobro });
     setFormMonto(cc.cobro?.monto?.toString() ?? cc.cliente.monto_mensual.toString());
     setFormEstado((cc.cobro?.estado as EstadoCobro) ?? 'pagado');
@@ -389,8 +389,54 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     );
     setShowNewRecibidoPor(false);
     setNewRecibidoPor('');
+  }
+
+  function openModal(cc: ClienteCobro) {
+    loadFormFromClienteCobro(cc);
     setModalOpen(true);
   }
+
+  // Navegación entre clientes dentro del modal (flecha izquierda/derecha)
+  const currentModalIndex = useMemo(() => {
+    if (!modalData) return -1;
+    return filtered.findIndex((cc) => cc.cliente.id === modalData.cliente.id);
+  }, [filtered, modalData]);
+
+  function navigateModal(direction: 'prev' | 'next') {
+    if (currentModalIndex === -1 || filtered.length === 0) return;
+    const newIndex = direction === 'next'
+      ? Math.min(currentModalIndex + 1, filtered.length - 1)
+      : Math.max(currentModalIndex - 1, 0);
+    if (newIndex === currentModalIndex) return;
+    loadFormFromClienteCobro(filtered[newIndex]);
+  }
+
+  // Keyboard shortcuts dentro del modal: ←/→ navegar, Esc cerrar
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Si el foco está en un input/textarea/select, no interceptar (excepto Escape)
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isFormField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if (e.key === 'Escape') {
+        closeModal();
+      } else if (!isFormField && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateModal('prev');
+      } else if (!isFormField && e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateModal('next');
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, currentModalIndex, filtered.length]);
 
   function closeModal() {
     setModalOpen(false);
@@ -928,17 +974,52 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       {modalOpen && modalData && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">
-                Cobro — {modalData.cliente.nombre} {modalData.cliente.apellido}
-              </h2>
-              <button onClick={closeModal} className="text-gray-500 hover:text-white transition-colors">
-                <X size={20} />
+            {/* Header con navegación entre clientes */}
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => navigateModal('prev')}
+                disabled={currentModalIndex <= 0}
+                className="p-2 rounded-lg bg-[#1C2333] hover:bg-[#2A3142] text-gray-300 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                title="Cliente anterior (← flecha izquierda)"
+                aria-label="Cliente anterior"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <div className="flex-1 text-center min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-white truncate">
+                  {modalData.cliente.nombre} {modalData.cliente.apellido}
+                </h2>
+                {currentModalIndex >= 0 && (
+                  <div className="text-[11px] text-gray-500 tabular">
+                    {currentModalIndex + 1} de {filtered.length}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => navigateModal('next')}
+                disabled={currentModalIndex >= filtered.length - 1}
+                className="p-2 rounded-lg bg-[#1C2333] hover:bg-[#2A3142] text-gray-300 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                title="Cliente siguiente (→ flecha derecha)"
+                aria-label="Cliente siguiente"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+              <button onClick={closeModal} className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-[#1C2333] transition-colors flex-shrink-0 ml-1" aria-label="Cerrar">
+                <X size={18} />
               </button>
             </div>
-            <p className="text-sm text-gray-400 mb-4">
+
+            <p className="text-xs sm:text-sm text-gray-400 mb-4 text-center">
               {meses[currentMonth - 1]} {currentYear} &middot; Plan: {modalData.cliente.plan ?? 'N/A'} &middot; Mensualidad: {formatCurrency(modalData.cliente.monto_mensual)}
             </p>
+
+            {/* Tip de atajos */}
+            <div className="text-[10px] text-gray-600 text-center mb-3 hidden sm:block">
+              💡 Usa <kbd className="px-1.5 py-0.5 rounded bg-[#1C2333] border border-[#1F2937] text-gray-400">←</kbd> y <kbd className="px-1.5 py-0.5 rounded bg-[#1C2333] border border-[#1F2937] text-gray-400">→</kbd> para navegar entre clientes
+            </div>
             <form onSubmit={handleModalSubmit} className="space-y-4">
               {/* Estado */}
               <div>

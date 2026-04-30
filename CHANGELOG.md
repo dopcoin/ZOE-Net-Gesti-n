@@ -6,6 +6,24 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.8] — 2026-04-29
+
+### Added
+- **Navegación entre clientes en el modal de cobros** sin cerrar la ventana:
+  - Botones `<` y `>` en el header del modal con tooltip
+  - Indicador "X de N" mostrando posición actual en la lista filtrada
+  - Atajos de teclado: `←` y `→` para navegar
+  - `Esc` para cerrar
+  - Las teclas se respetan dentro de inputs (no rompen escritura)
+  - El form se actualiza automáticamente al saltar al siguiente cliente
+- **Tip visual** dentro del modal explicando los atajos de teclado.
+- **Migración Database aplicada** vía Management API:
+  - `clientes.fecha_retiro`, `facturas.fecha`, `instalaciones.metodo_pago/recibido_en/fotos`, `libro_diario.origen_id/origen_tipo/metodo_pago/recibido_en`, `cobros.recibido_por`
+  - Constraint `cobros_estado_check` actualizado para aceptar `'condonado'`
+  - RLS policy `ver_libro_diario`
+  - Bucket Storage `instalacion-fotos` con sus 4 RLS policies
+- Script de runtime: `scripts/run-migration.mjs` (reusable con `SUPABASE_PAT=...`).
+
 ## [1.3.7] — 2026-04-29
 
 ### Fixed
