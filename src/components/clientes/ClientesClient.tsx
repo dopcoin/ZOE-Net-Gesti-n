@@ -243,8 +243,9 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
       const payload = buildPayload();
 
       // Helper: handler de error con retry sin fecha_retiro si la columna no existe
+      type ResultWithError = { error?: { message: string; code?: string; details?: string; hint?: string } };
       const handleSaveError = async (
-        result: Awaited<ReturnType<typeof createCliente>>,
+        result: ResultWithError,
         opName: 'create' | 'update'
       ): Promise<{ ok: boolean; retried: boolean }> => {
         if (!result.error) return { ok: true, retried: false };

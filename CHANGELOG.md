@@ -6,6 +6,32 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-04-29
+
+Sprint de productividad operacional — las 3 recomendaciones top del análisis ejecutivo.
+
+### Added
+- **Bulk pagos en `/cobros`**:
+  - Checkbox por cliente (no aparece para pagados/exonerados/condonados)
+  - Checkbox maestro en header para seleccionar todos los pendientes/mora a la vez
+  - Barra sticky de bulk acción cuando hay seleccionados (con total a recibir)
+  - Modal de confirmación con: tipo de pago, recibido por, lista de clientes seleccionados, total
+  - Procesa todos en secuencia → registra cada cobro como pagado + libro diario
+  - Antes: 26 clicks individuales de "Pagar". Ahora: 1 click + confirmar.
+- **Botón WhatsApp** en cada fila de `/cobros` (visible si cliente tiene teléfono y cobro está pendiente/mora/parcial):
+  - Abre `wa.me/{numero}` con mensaje pre-armado profesional
+  - Mensaje incluye: nombre del cliente, mes, monto, marca ZOE Net
+  - Si está en mora, se agrega frase pidiendo regularizar
+  - Auto-prefija "1" en el código de país de RD si falta
+- **`logActivity()` conectado** automáticamente a TODOS los services CRUD:
+  - `clientes`, `cobros`, `tareas`, `mercancia`, `ventas`, `instalaciones`, `facturas`, `libro_diario`, `revendedores`, `ganancias_revendedores`, `conciliacion`
+  - Cada acción registra: usuario, acción, entidad, ID, detalle legible
+  - Detección especial de "Producto liquidado" cuando `activo=false` y `stock=0`
+  - La página `/historial` ya se popula automáticamente con cada operación
+
+### Changed
+- `createCliente`, `createTarea`, `createMercancia`, `createVenta`, `createInstalacion`, `createFactura` ahora retornan `{ id }` en `data` (cambio menor de tipo, retro-compatible).
+
 ## [1.4.2] — 2026-04-29
 
 ### Fixed
