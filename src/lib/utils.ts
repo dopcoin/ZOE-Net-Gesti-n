@@ -47,6 +47,7 @@ export function estadoCobroColor(estado: EstadoCobro): string {
     mora: 'bg-red-500/20 text-red-400',
     exonerado: 'bg-purple-500/20 text-purple-400',
     parcial: 'bg-blue-500/20 text-blue-400',
+    condonado: 'bg-cyan-500/20 text-cyan-400',
   };
   return map[estado] || 'bg-gray-500/20 text-gray-400';
 }

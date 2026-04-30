@@ -6,6 +6,26 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-04-29
+
+### Added
+- **Nuevo estado de cobro: `condonado`** — perdonar el cobro de un mes específico (cortes de servicio, fallas, cortesía):
+  - Distinto a `exonerado` (cliente becado permanente)
+  - Solo aplica al mes específico, no afecta a meses futuros
+  - Monto se setea automáticamente en RD$0 (no aplica)
+  - Color cyan en el badge para distinguir visualmente
+  - Migración SQL: `supabase/migrations/20260429_v1_3_2_condonado.sql`
+- **Botón rápido "Condonar"** en cada fila de la lista de cobros (entre "Pagar" y "Mora")
+  - Confirmación antes de aplicar
+  - Nota automática: "Condonado por cortes/falla de servicio"
+- **Stats actualizados**:
+  - "Tasa de cobro" ahora cuenta condonados como resueltos (no penaliza el porcentaje)
+  - "Por cobrar" excluye condonados y exonerados (es realista)
+  - Pagados+parciales se cuentan juntos para "Total recaudado"
+
+### Fixed
+- El monto del modal se auto-restablece al monto mensual del cliente cuando cambias entre estados (pagado/pendiente/mora) — antes había que escribirlo manualmente.
+
 ## [1.3.1] — 2026-04-29
 
 ### Added

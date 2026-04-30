@@ -105,18 +105,21 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
   const stats = useMemo(() => {
     const total = clientesCobros.length;
     const exonerados = clientesCobros.filter((cc) => cc.estado === 'exonerado').length;
+    const condonados = clientesCobros.filter((cc) => cc.estado === 'condonado').length;
     const pagados = clientesCobros.filter((cc) => cc.estado === 'pagado').length;
+    const parciales = clientesCobros.filter((cc) => cc.estado === 'parcial').length;
     const enMora = clientesCobros.filter((cc) => cc.estado === 'mora').length;
     const totalRecaudado = clientesCobros
-      .filter((cc) => cc.estado === 'pagado' && cc.cobro)
+      .filter((cc) => (cc.estado === 'pagado' || cc.estado === 'parcial') && cc.cobro)
       .reduce((sum, cc) => sum + (cc.cobro?.monto ?? 0), 0);
+    // Por cobrar: NO incluye pagados, exonerados, condonados ni parciales (parciales tienen su propio monto)
     const porCobrar = clientesCobros
-      .filter((cc) => cc.estado !== 'pagado' && cc.estado !== 'exonerado')
+      .filter((cc) => cc.estado === 'pendiente' || cc.estado === 'mora')
       .reduce((sum, cc) => sum + cc.cliente.monto_mensual, 0);
-    // Exonerados are resolved — exclude from denominator for tasa de cobro
-    const cobrables = total - exonerados;
-    const tasaCobro = cobrables > 0 ? Math.round((pagados / cobrables) * 100) : 0;
-    return { total, pagados, exonerados, enMora, totalRecaudado, porCobrar, tasaCobro, cobrables };
+    // Exonerados y condonados son "resueltos" — no cuentan para tasa de cobro
+    const cobrables = total - exonerados - condonados;
+    const tasaCobro = cobrables > 0 ? Math.round(((pagados + parciales) / cobrables) * 100) : 0;
+    return { total, pagados, parciales, exonerados, condonados, enMora, totalRecaudado, porCobrar, tasaCobro, cobrables };
   }, [clientesCobros]);
 
   function prevMonth() {
@@ -610,7 +613,7 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 md:justify-end">
-                  {cc.estado !== 'pagado' && cc.estado !== 'exonerado' && (
+                  {cc.estado !== 'pagado' && cc.estado !== 'exonerado' && cc.estado !== 'condonado' && (
                     (cc.cliente.beca || cc.cliente.estado === 'becado') ? (
                       <button
                         onClick={() => upsertCobro(cc.cliente.id, 'exonerado', 0, null, 'Beca aplicada', null, cc.cobro?.id).then(() => { toast.success('Cobro exonerado'); router.refresh(); }).catch(() => toast.error('Error al exonerar'))}
@@ -627,6 +630,21 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
                         >
                           {loading === `pay-${cc.cliente.id}` ? '...' : 'Pagar'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!confirm(`¿Condonar el cobro de ${cc.cliente.nombre} para este mes?\n\nNo se le cobrará por servicio defectuoso, cortes o cortesía.\nNo afecta meses futuros.`)) return;
+                            setLoading(`condonar-${cc.cliente.id}`);
+                            upsertCobro(cc.cliente.id, 'condonado', 0, null, 'Condonado por cortes/falla de servicio', null, cc.cobro?.id)
+                              .then(() => { toast.success('Cobro condonado'); router.refresh(); })
+                              .catch(() => toast.error('Error al condonar'))
+                              .finally(() => setLoading(null));
+                          }}
+                          disabled={loading === `condonar-${cc.cliente.id}`}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors disabled:opacity-50"
+                          title="No cobrar este mes (cortes/falla de servicio)"
+                        >
+                          {loading === `condonar-${cc.cliente.id}` ? '...' : 'Condonar'}
                         </button>
                         <button
                           onClick={() => handleQuickMora(cc)}
@@ -679,18 +697,42 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                 <label className="label">Estado</label>
                 <select
                   value={formEstado}
-                  onChange={(e) => setFormEstado(e.target.value as EstadoCobro)}
+                  onChange={(e) => {
+                    const newEstado = e.target.value as EstadoCobro;
+                    setFormEstado(newEstado);
+                    // Auto-llenar monto según el estado
+                    if (newEstado === 'condonado' || newEstado === 'exonerado') {
+                      setFormMonto('0');
+                    } else if (newEstado === 'pagado' || newEstado === 'pendiente' || newEstado === 'mora') {
+                      // Si está vacío o era 0, llenar con monto mensual
+                      if (!formMonto || formMonto === '0') {
+                        setFormMonto(String(modalData?.cliente.monto_mensual ?? 0));
+                      }
+                    }
+                  }}
                   className="input w-full"
                 >
-                  <option value="pagado">Pagado</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="mora">Mora</option>
-                  <option value="parcial">Parcial</option>
-                  <option value="exonerado">Exonerado</option>
+                  <option value="pagado">✅ Pagado</option>
+                  <option value="parcial">🔵 Parcial (pago reducido)</option>
+                  <option value="pendiente">⏳ Pendiente</option>
+                  <option value="mora">⚠️ Mora</option>
+                  <option value="condonado">🌀 Condonado (cortes/falla servicio)</option>
+                  <option value="exonerado">🎓 Exonerado (becado)</option>
                 </select>
+                {formEstado === 'condonado' && (
+                  <p className="text-[11px] text-cyan-400 mt-1.5 flex items-start gap-1">
+                    <span>💡</span>
+                    <span>El cliente NO paga este mes por motivos de servicio (cortes/fallas). No afecta su estado ni meses futuros.</span>
+                  </p>
+                )}
               </div>
               <div>
-                <label className="label">Monto</label>
+                <label className="label">
+                  Monto
+                  {(formEstado === 'condonado' || formEstado === 'exonerado') && (
+                    <span className="text-[10px] text-gray-500 ml-2">(no aplica)</span>
+                  )}
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -698,7 +740,8 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
                   value={formMonto}
                   onChange={(e) => setFormMonto(e.target.value)}
                   className="input w-full"
-                  required
+                  disabled={formEstado === 'condonado' || formEstado === 'exonerado'}
+                  required={formEstado !== 'condonado' && formEstado !== 'exonerado'}
                 />
               </div>
               {(formEstado === 'pagado' || formEstado === 'parcial') && (

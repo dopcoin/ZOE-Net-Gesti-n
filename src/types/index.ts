@@ -2,7 +2,7 @@ export type Rol = 'admin' | 'soporte' | 'financiero' | 'administrativo';
 
 export type EstadoCliente = 'activo' | 'inactivo' | 'nuevo' | 'becado' | 'suspendido';
 
-export type EstadoCobro = 'pagado' | 'pendiente' | 'mora' | 'exonerado' | 'parcial';
+export type EstadoCobro = 'pagado' | 'pendiente' | 'mora' | 'exonerado' | 'parcial' | 'condonado';
 
 export type TipoCobro = 'efectivo' | 'transferencia' | 'tarjeta' | 'otro';
 
