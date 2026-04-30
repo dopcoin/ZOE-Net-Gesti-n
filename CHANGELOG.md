@@ -6,6 +6,12 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.7] — 2026-04-29
+
+### Fixed
+- **Warning falso al guardar cliente activo**: el toast de "Cliente guardado pero la fecha de retiro no se persistió" solo aparece ahora si REALMENTE había una fecha de retiro en el form. Para clientes activos comunes, sale `toast.success` normal.
+- **"Error al aplicar la remisión: [object Object]"**: el catch ahora extrae correctamente `message`/`details`/`hint` del error de Supabase. Los constraint violations muestran un mensaje claro indicando que falta la migración SQL.
+
 ## [1.3.6] — 2026-04-29
 
 ### Fixed

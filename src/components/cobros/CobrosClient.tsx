@@ -102,11 +102,20 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
       toast.success(isTotal ? 'Cobro remitido al 100%' : `Remisión ${porcentajeRemision}% aplicada`);
       router.refresh();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      // Extraer mensaje legible (puede ser Error, ServiceError, o un objeto Supabase)
+      let msg = '';
+      if (err instanceof Error) {
+        msg = err.message;
+      } else if (err && typeof err === 'object') {
+        const e = err as Record<string, unknown>;
+        msg = (e.message as string) || (e.details as string) || (e.hint as string) || JSON.stringify(err);
+      } else {
+        msg = String(err);
+      }
       // Detectar el constraint violation de 'condonado'
-      if (msg.includes('cobros_estado_check') || msg.includes('check constraint')) {
+      if (msg.includes('cobros_estado_check') || msg.includes('check constraint') || msg.includes('violates check')) {
         toast.error(
-          'La BD aún no acepta el estado "condonado". Ejecuta el SQL pendiente: supabase/migrations/EJECUTAR_AHORA.sql',
+          'La BD aún no acepta el estado "condonado/remitido". Falta ejecutar el SQL de migración pendiente.',
           { duration: 8000 }
         );
       } else {
