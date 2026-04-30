@@ -11,7 +11,7 @@ export default async function GastosPage() {
   // Solo egresos, del año actual hacia adelante (suficiente para análisis)
   const { data: gastos } = await supabase
     .from('libro_diario')
-    .select('id, fecha, categoria, descripcion, monto, metodo_pago, recibido_en, referencia, tipo')
+    .select('id, fecha, categoria, descripcion, monto, metodo_pago, recibido_en, referencia, tipo, recurrente, frecuencia')
     .eq('tipo', 'egreso')
     .gte('fecha', yearStart)
     .order('fecha', { ascending: false });

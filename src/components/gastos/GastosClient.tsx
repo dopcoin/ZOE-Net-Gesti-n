@@ -8,7 +8,7 @@ import { createRegistroDiario, updateRegistroDiario, deleteRegistroDiario, getEr
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  Plus, X, Edit2, Trash2, Receipt, Calendar, Tag, Search,
+  Plus, X, Edit2, Trash2, Receipt, Calendar, Tag, Search, RefreshCw, Repeat,
   Briefcase, Wrench, Plane, Zap, Package as PackageIcon, ShoppingBag, FileQuestion,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -24,7 +24,16 @@ interface GastoEntry {
   recibido_en: string | null;
   referencia: string | null;
   tipo: string;
+  recurrente: boolean | null;
+  frecuencia: string | null;
 }
+
+const FRECUENCIAS = [
+  { key: 'mensual', label: 'Mensual' },
+  { key: 'quincenal', label: 'Quincenal' },
+  { key: 'semanal', label: 'Semanal' },
+  { key: 'anual', label: 'Anual' },
+] as const;
 
 interface Props {
   gastos: GastoEntry[];
@@ -61,6 +70,8 @@ const emptyForm = {
   referencia: '',
   metodo_pago: '',
   recibido_en: '',
+  recurrente: false,
+  frecuencia: 'mensual' as string,
 };
 
 function getCategoriaIcon(cat: string): CategoriaPreset {
@@ -176,6 +187,8 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
       referencia: g.referencia ?? '',
       metodo_pago: g.metodo_pago ?? '',
       recibido_en: g.recibido_en ?? '',
+      recurrente: g.recurrente ?? false,
+      frecuencia: g.frecuencia ?? 'mensual',
     });
     setEditingId(g.id);
     setModalMode('edit');
@@ -201,6 +214,8 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
       metodo_pago: formData.metodo_pago.trim() || null,
       recibido_en: formData.recibido_en.trim() || null,
       registrado_por: profile?.id ?? null,
+      recurrente: formData.recurrente,
+      frecuencia: formData.recurrente ? formData.frecuencia : null,
     };
 
     try {
@@ -218,6 +233,88 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
     } finally {
       setLoading(false);
     }
+  }
+
+  // Lista de gastos marcados como recurrentes (los más recientes por descripción única)
+  const gastosRecurrentes = useMemo(() => {
+    const recurrentes = gastos.filter((g) => g.recurrente);
+    // Quedarse con el más reciente por descripción + categoría (para evitar duplicados)
+    const map = new Map<string, GastoEntry>();
+    for (const g of recurrentes) {
+      const key = `${g.categoria}::${g.descripcion}`;
+      const existing = map.get(key);
+      if (!existing || (g.fecha ?? '') > (existing.fecha ?? '')) {
+        map.set(key, g);
+      }
+    }
+    return Array.from(map.values());
+  }, [gastos]);
+
+  // Genera copias de los gastos recurrentes con fecha del mes actual.
+  // Solo crea si NO existe ya un gasto con misma descripción + mes/año.
+  async function generarRecurrentesDelMes() {
+    if (gastosRecurrentes.length === 0) {
+      toast.error('No hay gastos marcados como recurrentes todavía');
+      return;
+    }
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = today.getMonth();
+    const targetISO = todayISO();
+
+    // Filtrar los que YA existen este mes (para no duplicar)
+    const existentesEsteMes = new Set(
+      gastos
+        .filter((g) => {
+          if (!g.fecha) return false;
+          const d = new Date(g.fecha + 'T00:00:00');
+          return d.getFullYear() === yyyy && d.getMonth() === mm;
+        })
+        .map((g) => `${g.categoria}::${g.descripcion}`)
+    );
+
+    const aCrear = gastosRecurrentes.filter(
+      (g) => !existentesEsteMes.has(`${g.categoria}::${g.descripcion}`)
+    );
+
+    if (aCrear.length === 0) {
+      toast.info('Todos los gastos recurrentes ya están registrados este mes ✓');
+      return;
+    }
+
+    if (!confirm(
+      `¿Generar ${aCrear.length} gasto${aCrear.length > 1 ? 's' : ''} recurrente${aCrear.length > 1 ? 's' : ''} para este mes?\n\n` +
+      aCrear.map((g) => `  • ${g.descripcion} — RD$${g.monto.toLocaleString('es-DO')}`).join('\n')
+    )) return;
+
+    setLoading(true);
+    let creados = 0, errores = 0;
+    for (const g of aCrear) {
+      const payload = {
+        fecha: targetISO,
+        tipo: 'egreso' as const,
+        categoria: g.categoria,
+        descripcion: g.descripcion,
+        monto: g.monto,
+        referencia: null,
+        metodo_pago: g.metodo_pago,
+        recibido_en: g.recibido_en,
+        registrado_por: profile?.id ?? null,
+        recurrente: true,
+        frecuencia: g.frecuencia,
+      };
+      const result = await createRegistroDiario(payload);
+      if (result.error) {
+        errores++;
+        console.error('[Gastos] Error generando recurrente:', g.descripcion, result.error);
+      } else {
+        creados++;
+      }
+    }
+    setLoading(false);
+    if (creados > 0) toast.success(`${creados} gasto${creados > 1 ? 's' : ''} recurrente${creados > 1 ? 's' : ''} generado${creados > 1 ? 's' : ''}`);
+    if (errores > 0) toast.error(`${errores} fallaron — ver consola`);
+    router.refresh();
   }
 
   async function handleDelete(g: GastoEntry) {
@@ -246,11 +343,25 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
         iconColor="text-red-400"
         iconBg="bg-red-500/10"
         actions={
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden xs:inline">Nuevo Gasto</span>
-            <span className="inline xs:hidden">Nuevo</span>
-          </button>
+          <>
+            {gastosRecurrentes.length > 0 && (
+              <button
+                onClick={generarRecurrentesDelMes}
+                disabled={loading}
+                className="btn-secondary flex items-center gap-2 border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
+                title={`Genera copias de los ${gastosRecurrentes.length} gastos marcados como recurrentes para el mes actual`}
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">Generar recurrentes</span>
+                <span className="inline sm:hidden">Recurrentes</span>
+              </button>
+            )}
+            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              <span className="hidden xs:inline">Nuevo Gasto</span>
+              <span className="inline xs:hidden">Nuevo</span>
+            </button>
+          </>
         }
       />
 
@@ -375,6 +486,12 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
                 </div>
                 <div className="list-card-meta">
                   <span>{g.fecha ? formatDate(g.fecha) : '—'}</span>
+                  {g.recurrente && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                      <Repeat size={9} />
+                      {g.frecuencia ?? 'recurrente'}
+                    </span>
+                  )}
                   {g.metodo_pago && <span className="badge badge-info text-[10px]">{g.metodo_pago}</span>}
                   {g.recibido_en && <span className="text-gray-400">· {g.recibido_en}</span>}
                   {g.referencia && <span className="text-gray-500">Ref: {g.referencia}</span>}
@@ -428,7 +545,15 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
                         </span>
                       </td>
                       <td className="table-cell text-gray-200">
-                        {g.descripcion}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{g.descripcion}</span>
+                          {g.recurrente && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                              <Repeat size={9} />
+                              {g.frecuencia ?? 'recurrente'}
+                            </span>
+                          )}
+                        </div>
                         {g.referencia && (
                           <div className="text-xs text-gray-500 mt-0.5">Ref: {g.referencia}</div>
                         )}
@@ -603,6 +728,57 @@ export default function GastosClient({ gastos: initialGastos, categoriasUsadas }
                   className="input"
                   placeholder="No. cheque, factura, etc."
                 />
+              </div>
+
+              {/* Recurrente toggle */}
+              <div className="border-t border-[#1F2937] pt-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-200 flex items-center gap-1.5">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+                      Gasto recurrente
+                    </label>
+                    <p className="text-[11px] text-gray-500">Para nóminas, alquileres, suscripciones que se repiten</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((p) => ({ ...p, recurrente: !p.recurrente }))}
+                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                      formData.recurrente ? 'bg-blue-600' : 'bg-[#1C2333] border border-[#1F2937]'
+                    }`}
+                    aria-label="Toggle recurrente"
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                        formData.recurrente ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {formData.recurrente && (
+                  <div className="mt-3">
+                    <label className="label">Frecuencia</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {FRECUENCIAS.map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, frecuencia: f.key }))}
+                          className={`px-2 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                            formData.frecuencia === f.key
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                              : 'bg-[#1C2333] text-gray-400 border-[#1F2937] hover:text-gray-200'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-2">
+                      💡 Usa el botón <span className="text-blue-400 font-semibold">&quot;Generar recurrentes&quot;</span> arriba para clonar al mes actual.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

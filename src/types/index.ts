@@ -203,6 +203,8 @@ export interface LibroDiario {
   registrado_por: string | null;
   origen_id: string | null;
   origen_tipo: string | null;
+  recurrente: boolean | null;
+  frecuencia: string | null;
   created_at: string;
   profiles?: { nombre: string; apellido: string } | null;
 }

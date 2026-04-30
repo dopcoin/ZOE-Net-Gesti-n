@@ -73,15 +73,25 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
   }, [items, search, categoriaFilter]);
 
   // --- Stats ---
+  // Liquidado = activo=false + stock=0. No cuenta para valor del inventario ni stock bajo.
   const stats = useMemo(() => {
+    const liquidados = items.filter((i) => !i.activo && i.stock === 0).length;
+    const inactivos = items.filter((i) => !i.activo && i.stock > 0).length;
+    const activos = items.filter((i) => i.activo);
     const totalItems = items.length;
-    const valorTotal = items.reduce((acc, i) => acc + i.stock * i.precio_compra, 0);
-    const lowStock = items.filter((i) => i.stock < i.stock_minimo).length;
-    const activeItems = items.filter((i) => i.activo).length;
-    return { totalItems, valorTotal, lowStock, activeItems };
+    const activeItems = activos.length;
+    // Valor total: SOLO productos activos (los liquidados están fuera de circulación)
+    const valorTotal = activos.reduce((acc, i) => acc + i.stock * i.precio_compra, 0);
+    // Stock bajo: solo entre activos
+    const lowStock = activos.filter((i) => i.stock < i.stock_minimo).length;
+    return { totalItems, valorTotal, lowStock, activeItems, liquidados, inactivos };
   }, [items]);
 
-  const lowStockItems = useMemo(() => items.filter((i) => i.stock < i.stock_minimo), [items]);
+  // Solo activos para el panel de stock bajo
+  const lowStockItems = useMemo(
+    () => items.filter((i) => i.activo && i.stock < i.stock_minimo),
+    [items]
+  );
 
   // --- Category counts ---
   const categoriaCounts = useMemo(() => {
@@ -183,6 +193,33 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
     if (refreshed) setItems(refreshed);
 
     closeModal();
+    setLoading(false);
+  };
+
+  // Marca producto como liquidado: stock=0, activo=false. No se elimina del histórico.
+  const handleLiquidar = async (item: Mercancia) => {
+    const stockActual = item.stock;
+    const ok = confirm(
+      `¿Marcar "${item.nombre}" como LIQUIDADO?\n\n` +
+      (stockActual > 0
+        ? `⚠ Stock actual: ${stockActual} → se pondrá en 0\n`
+        : '') +
+      `El producto:\n` +
+      `  • Sale del inventario activo (no aparece en valor total)\n` +
+      `  • No se puede vender hasta reactivarlo\n` +
+      `  • Se mantiene el histórico de ventas\n\n` +
+      `Para reactivar: edítalo y vuelve a poner stock + activar.`
+    );
+    if (!ok) return;
+    setLoading(true);
+    const result = await updateMercancia(item.id, { activo: false, stock: 0 });
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      setLoading(false);
+      return;
+    }
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, activo: false, stock: 0 } : i)));
+    toast.success(`"${item.nombre}" marcado como liquidado`);
     setLoading(false);
   };
 
@@ -443,19 +480,25 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                         )}
                       </td>
                       <td className="table-cell text-center">
-                        <span
-                          className={`badge ${
-                            item.activo
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-gray-500/20 text-gray-400'
-                          }`}
-                        >
-                          {item.activo ? 'Activo' : 'Inactivo'}
-                        </span>
+                        {(() => {
+                          const liquidado = !item.activo && item.stock === 0;
+                          if (liquidado) return <span className="badge bg-amber-500/20 text-amber-400 border border-amber-500/30">Liquidado</span>;
+                          if (!item.activo) return <span className="badge bg-gray-500/20 text-gray-400">Inactivo</span>;
+                          return <span className="badge bg-emerald-500/20 text-emerald-400">Activo</span>;
+                        })()}
                       </td>
                       <td className="table-cell text-right">
                         {canEdit ? (
                           <div className="flex items-center justify-end gap-1">
+                            {item.activo && (
+                              <button
+                                onClick={() => handleLiquidar(item)}
+                                className="px-2 py-1 text-[11px] font-medium rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors"
+                                title="Marcar como liquidado (stock=0, sale del inventario activo)"
+                              >
+                                Liquidar
+                              </button>
+                            )}
                             <button
                               onClick={() => openEdit(item)}
                               className="p-1.5 rounded-lg hover:bg-[#1C2333] text-gray-400 hover:text-blue-400 transition-colors"

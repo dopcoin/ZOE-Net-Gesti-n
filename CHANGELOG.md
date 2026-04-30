@@ -6,6 +6,26 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-04-29
+
+### Added
+- **Botón "Liquidar"** en cada fila del inventario:
+  - Marca producto como `activo=false` + `stock=0`
+  - Sale del cálculo de **valor total del inventario** y **stock bajo**
+  - Mantiene el histórico (no se borra del DB)
+  - Badge "Liquidado" en color amber para distinguirlo de "Inactivo" (gris)
+  - **Backfill aplicado**: 3 productos del seed con "Liquidado" en su descripción ya están marcados (MOTO E15, HONOR PLAY 10, MOTO G06)
+  - Reactivar = editar y poner stock + activo=true
+- **Gastos recurrentes** en `/gastos`:
+  - Toggle "Gasto recurrente" en el form (con frecuencia: mensual / quincenal / semanal / anual)
+  - Migración aplicada: `libro_diario.recurrente boolean` y `libro_diario.frecuencia text`
+  - Botón "**Generar recurrentes**" en el header (visible si hay al menos 1 marcado como recurrente):
+    - Clona los gastos recurrentes con fecha del mes actual
+    - Detecta duplicados — no genera si ya existe el mismo (categoría + descripción) este mes
+    - Confirma con la lista exacta antes de crear
+  - Badge azul 🔁 visible en mobile y desktop para gastos marcados como recurrentes
+  - Caso de uso: nóminas, alquileres, suscripciones, internet — registrar una vez y duplicar cada mes con un click
+
 ## [1.3.9] — 2026-04-29
 
 ### Added
