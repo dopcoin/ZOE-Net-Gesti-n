@@ -222,12 +222,11 @@ export default function ClientesClient({ clientes: initialClientes, ubicaciones:
     payload.estado = raw.estado;
     payload.monto_mensual = raw.monto_mensual;
     payload.beca = formData.beca; // boolean — must always be included even if false
-    // fecha_retiro: incluir solo si tiene valor (al reactivar cliente, hay que limpiar manualmente)
+    // fecha_retiro: SOLO se incluye si tiene valor.
+    // Si reactivas un cliente, hay que borrar manualmente la fecha vieja (no se envía null
+    // para evitar errores PGRST204 cuando la columna no existe en BD).
     if (formData.fecha_retiro) {
       payload.fecha_retiro = formData.fecha_retiro;
-    } else if (formData.estado === 'activo' || formData.estado === 'becado' || formData.estado === 'nuevo') {
-      // Cliente reactivado → limpiar la fecha de retiro
-      payload.fecha_retiro = null;
     }
     return payload;
   };

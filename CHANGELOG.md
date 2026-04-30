@@ -6,6 +6,12 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.6] — 2026-04-29
+
+### Fixed
+- **Error PGRST204 al guardar cliente activo** (cualquier cambio): el código ya no envía `fecha_retiro: null` al payload cuando el cliente está activo/becado/nuevo. Solo se envía cuando tiene un valor real. Esto evita el error de "column not found" mientras la migración SQL no se haya ejecutado.
+- **Trade-off conocido**: si reactivas un cliente que tenía fecha_retiro, ahora hay que borrar manualmente la fecha desde el form (visible solo cuando el estado es suspendido/inactivo). Antes se borraba automáticamente.
+
 ## [1.3.5] — 2026-04-29
 
 ### Added
