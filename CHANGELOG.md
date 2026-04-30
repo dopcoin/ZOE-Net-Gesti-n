@@ -6,6 +6,14 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-04-29
+
+### Fixed
+- **Error PGRST 23514 al crear cliente nuevo** con tipo de pago "Efectivo", "Transferencia", "Tarjeta" o "Cheque": el `clientes_tipo_pago_check` solo aceptaba valores legacy lowercase (`cash`, `transferencia`, `cheque`, `deposito`).
+  - Constraint expandido para aceptar **ambos formatos**: capitalizados con tilde (`Efectivo`, `Transferencia`, `Tarjeta`, `Cheque`, `Depósito`, `Otro`) y los legacy lowercase.
+  - El mismo fix aplicado a `cobros_tipo_pago_check` por consistencia.
+  - Cero data migration necesaria — los registros existentes con valores legacy siguen siendo válidos.
+
 ## [1.4.0] — 2026-04-29
 
 ### Added
