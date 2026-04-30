@@ -96,6 +96,7 @@ export interface Mercancia {
   stock: number;
   stock_minimo: number;
   activo: boolean;
+  fecha_entrada: string | null;
   created_at: string;
   updated_at: string;
   categorias_mercancia?: CategoriaMercancia;

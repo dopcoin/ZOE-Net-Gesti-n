@@ -6,6 +6,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.3.9] — 2026-04-29
+
+### Added
+- **`mercancia.fecha_entrada`** — fecha en que el producto entró al inventario:
+  - Migración aplicada vía Management API (columna creada y backfill con `created_at::date` para los 27 productos existentes).
+  - Form de inventario con campo "Fecha de entrada al inventario" (default = hoy al crear, valor existente al editar).
+  - Nueva columna "Entrada" en la tabla (entre Categoría y P. Compra) mostrando la fecha.
+  - Útil para análisis de rotación, antigüedad de stock y trazabilidad de órdenes (ej: orden Septiembre 2025 vs Enero 2026).
+
 ## [1.3.8] — 2026-04-29
 
 ### Added

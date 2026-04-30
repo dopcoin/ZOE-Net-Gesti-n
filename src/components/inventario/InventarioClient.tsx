@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { createMercancia, updateMercancia, deleteMercancia, getErrorMessage } from '@/lib/services';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, Package, AlertTriangle, X, Eye } from 'lucide-react';
 import type { Mercancia, CategoriaMercancia } from '@/types';
@@ -23,7 +23,10 @@ interface FormData {
   stock: string;
   stock_minimo: string;
   activo: boolean;
+  fecha_entrada: string;
 }
+
+const todayISO = () => new Date().toISOString().split('T')[0];
 
 const emptyForm: FormData = {
   nombre: '',
@@ -34,6 +37,7 @@ const emptyForm: FormData = {
   stock: '',
   stock_minimo: '',
   activo: true,
+  fecha_entrada: todayISO(),
 };
 
 export default function InventarioClient({ mercancia: initialMercancia, categorias, canEdit = true }: Props) {
@@ -119,6 +123,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       stock: String(item.stock),
       stock_minimo: String(item.stock_minimo),
       activo: item.activo,
+      fecha_entrada: item.fecha_entrada || (item.created_at ? item.created_at.split('T')[0] : todayISO()),
     });
     setModal({ open: true, mode: 'edit', id: item.id });
   };
@@ -146,6 +151,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       stock: parseInt(formData.stock) || 0,
       stock_minimo: parseInt(formData.stock_minimo) || 0,
       activo: formData.activo,
+      fecha_entrada: formData.fecha_entrada || todayISO(),
     };
 
     if (modal.mode === 'create') {
@@ -363,6 +369,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
               <tr className="border-b border-[#1F2937]">
                 <th className="table-header">Nombre</th>
                 <th className="table-header">Categoria</th>
+                <th className="table-header">Entrada</th>
                 <th className="table-header text-right">P. Compra</th>
                 <th className="table-header text-right">P. Venta</th>
                 <th className="table-header text-right">Margen</th>
@@ -402,6 +409,11 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                         ) : (
                           <span className="text-gray-500">--</span>
                         )}
+                      </td>
+                      <td className="table-cell text-xs text-gray-400 whitespace-nowrap">
+                        {item.fecha_entrada
+                          ? formatDate(item.fecha_entrada)
+                          : (item.created_at ? formatDate(item.created_at) : '—')}
                       </td>
                       <td className="table-cell text-right">{formatCurrency(item.precio_compra)}</td>
                       <td className="table-cell text-right text-white font-medium">
@@ -649,6 +661,23 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                     placeholder="0"
                   />
                 </div>
+              </div>
+
+              {/* Fecha de entrada */}
+              <div>
+                <label className="label flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Fecha de entrada al inventario
+                </label>
+                <input
+                  type="date"
+                  value={formData.fecha_entrada}
+                  onChange={(e) => updateField('fecha_entrada', e.target.value)}
+                  className="input"
+                />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Cuándo entró este producto al inventario (compra/orden).
+                </p>
               </div>
 
               {/* Activo toggle */}
