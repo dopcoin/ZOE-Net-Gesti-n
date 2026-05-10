@@ -6,6 +6,35 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-04-30
+
+### Added
+- **Factura imprimible / exportable a PDF en Instalaciones**:
+  - Nueva utility `src/lib/print-factura.ts` con función `printInstalacionFactura()`
+  - Genera un documento HTML profesional con marca **ZOE Net Internet** (logo gradiente, tipografía cuidada, colores corporativos)
+  - Incluye:
+    - Datos del cliente (nombre, cédula, teléfono, email, localidad)
+    - Dirección del servicio + técnico asignado + fecha
+    - Descripción del tipo de instalación (Nueva / Mantenimiento / Actualización / etc.)
+    - Tabla de servicio con subtotal y total destacado
+    - **Banner de estado** (Pagado / Pendiente / Sin Costo) con color semántico
+    - **Si está pagado**: muestra método de pago + recibido por
+    - **Si está pendiente**: incluye **datos bancarios completos** (Banreservas / Oscar Reyes / 9601205756 / 02601381185)
+    - Notas adicionales si existen
+    - Footer con agradecimiento + número de versión
+  - Número de factura auto-generado: `INST-{año}-{XXXXXX}` (6 chars del UUID)
+  - **Auto-trigger `window.print()`** al abrir → el usuario elige:
+    - Imprimir físicamente
+    - Guardar como PDF (destination del diálogo)
+    - Compartir el PDF guardado por WhatsApp/Email al cliente
+  - Sin dependencias externas (zero JS libraries, solo HTML + CSS)
+- **Botón "Imprimir / PDF"** (icono `Printer`) en cada fila de la tabla de instalaciones (al lado de Editar y Eliminar).
+- **Botón prominente "Imprimir / PDF"** en el footer del modal de edición de instalación (solo visible al editar, no al crear).
+
+### Changed
+- `instalaciones/page.tsx` ahora fetchea los campos adicionales del cliente (`telefono, email, cedula, direccion, localidad`) para que la factura tenga toda la info.
+- Interfaz `Instalacion.clientes` y `ClienteOption` ampliadas con los campos opcionales para imprimir.
+
 ## [1.5.0] — 2026-04-29
 
 Sprint de productividad operacional — las 3 recomendaciones top del análisis ejecutivo.

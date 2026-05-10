@@ -7,10 +7,11 @@ import { useAuthStore } from '@/store/authStore';
 import { createInstalacion, updateInstalacion, deleteInstalacion, getErrorMessage } from '@/lib/services';
 import { formatDate, estadoInstalacionColor, prioridadColor, meses } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign, ImageIcon, Camera } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Wrench, DollarSign, ImageIcon, Camera, Printer } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { EstadoInstalacion, Prioridad } from '@/types';
 import PhotoGallery from '@/components/shared/PhotoGallery';
+import { printInstalacionFactura } from '@/lib/print-factura';
 
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
 
@@ -31,13 +32,26 @@ interface Instalacion {
   recibido_en?: string | null;
   fotos?: string[] | null;
   created_at: string;
-  clientes?: { nombre: string; apellido: string };
+  clientes?: {
+    nombre: string;
+    apellido: string;
+    telefono?: string | null;
+    email?: string | null;
+    cedula?: string | null;
+    direccion?: string | null;
+    localidad?: string | null;
+  };
 }
 
 interface ClienteOption {
   id: string;
   nombre: string;
   apellido: string;
+  telefono?: string | null;
+  email?: string | null;
+  cedula?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
 }
 
 interface TecnicoOption {
@@ -261,6 +275,43 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
     setLoading(false);
   }
 
+  function handleImprimirFactura(inst: Instalacion) {
+    // Obtenemos los datos completos del cliente desde la lista
+    const clienteCompleto = clientes.find((c) => c.id === inst.cliente_id);
+    const cliente = clienteCompleto ?? inst.clientes ?? null;
+    if (!cliente) {
+      toast.error('No se encontraron datos del cliente');
+      return;
+    }
+    printInstalacionFactura({
+      instalacion: {
+        id: inst.id,
+        tipo: inst.tipo,
+        direccion: inst.direccion,
+        prioridad: inst.prioridad,
+        estado: inst.estado,
+        fecha_programada: inst.fecha_programada,
+        costo: inst.costo,
+        estado_cobro: inst.estado_cobro,
+        descripcion_cobro: inst.descripcion_cobro ?? null,
+        metodo_pago: inst.metodo_pago,
+        recibido_en: inst.recibido_en,
+        notas: inst.notas,
+        tecnico_asignado: inst.tecnico_asignado,
+        created_at: inst.created_at,
+      },
+      cliente: {
+        nombre: cliente.nombre,
+        apellido: cliente.apellido,
+        telefono: cliente.telefono,
+        email: cliente.email,
+        cedula: cliente.cedula,
+        direccion: cliente.direccion,
+        localidad: cliente.localidad,
+      },
+    });
+  }
+
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar esta instalación?')) return;
     const result = await deleteInstalacion(id);
@@ -397,10 +448,25 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                   </td>
                   <td className="table-cell">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(inst)} className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-white transition-colors">
+                      <button
+                        onClick={() => handleImprimirFactura(inst)}
+                        className="p-1.5 rounded hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-colors"
+                        title="Imprimir / Exportar PDF"
+                      >
+                        <Printer size={14} />
+                      </button>
+                      <button
+                        onClick={() => openEdit(inst)}
+                        className="p-1.5 rounded hover:bg-[#2A3142] text-gray-400 hover:text-white transition-colors"
+                        title="Editar"
+                      >
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDelete(inst.id)} className="p-1.5 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors">
+                      <button
+                        onClick={() => handleDelete(inst.id)}
+                        className="p-1.5 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Eliminar"
+                      >
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -703,13 +769,28 @@ export default function InstalacionesClient({ instalaciones: initial, clientes, 
                 />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 p-4 border-t border-[#1F2937]">
-              <button onClick={closeModal} className="btn-secondary">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={loading} className="btn-primary">
-                {loading ? 'Guardando...' : editing ? 'Actualizar' : 'Crear'}
-              </button>
+            <div className="flex items-center justify-between gap-3 p-4 border-t border-[#1F2937]">
+              {/* Botón de imprimir factura — solo cuando editas instalación existente */}
+              {editing && (
+                <button
+                  type="button"
+                  onClick={() => handleImprimirFactura(editing)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30 transition-colors"
+                  title="Generar factura imprimible / PDF para el cliente"
+                >
+                  <Printer size={14} />
+                  <span className="hidden sm:inline">Imprimir / PDF</span>
+                  <span className="inline sm:hidden">PDF</span>
+                </button>
+              )}
+              <div className="flex items-center gap-3 ml-auto">
+                <button onClick={closeModal} className="btn-secondary">
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={loading} className="btn-primary">
+                  {loading ? 'Guardando...' : editing ? 'Actualizar' : 'Crear'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -7,11 +7,11 @@ export default async function InstalacionesPage() {
   const supabase = await createClient();
   const { data: instalaciones } = await supabase
     .from('instalaciones')
-    .select('*, clientes(nombre, apellido)')
+    .select('*, clientes(nombre, apellido, telefono, email, cedula, direccion, localidad)')
     .order('created_at', { ascending: false });
   const { data: clientes } = await supabase
     .from('clientes')
-    .select('id, nombre, apellido')
+    .select('id, nombre, apellido, telefono, email, cedula, direccion, localidad')
     .order('nombre');
   const { data: tecnicos } = await supabase
     .from('profiles')
