@@ -559,3 +559,429 @@ function escapeHtml(str: string | null | undefined): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ============================================================
+// FACTURA FORMAL (multi-item con ITBIS y descuento)
+// ============================================================
+
+interface FacturaItemPrint {
+  descripcion: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+interface FacturaPrintData {
+  numero: string;
+  cliente_id: string | null;
+  items: FacturaItemPrint[];
+  subtotal: number;
+  descuento: number;
+  itbis: number; // porcentaje
+  total: number;
+  estado: string;
+  notas: string | null;
+  fecha: string | null;
+  created_at: string;
+}
+
+function getEstadoFacturaInfo(estado: string): { label: string; color: string; showPaymentInfo: boolean } {
+  switch (estado) {
+    case 'pagada':   return { label: 'PAGADA',     color: '#10B981', showPaymentInfo: false };
+    case 'pendiente':return { label: 'PENDIENTE',  color: '#F59E0B', showPaymentInfo: true };
+    case 'emitida':  return { label: 'EMITIDA',    color: '#3B82F6', showPaymentInfo: true };
+    case 'vencida':  return { label: 'VENCIDA',    color: '#EF4444', showPaymentInfo: true };
+    case 'anulada':  return { label: 'ANULADA',    color: '#6B7280', showPaymentInfo: false };
+    case 'cancelada':return { label: 'CANCELADA',  color: '#6B7280', showPaymentInfo: false };
+    default:         return { label: estado.toUpperCase(), color: '#6B7280', showPaymentInfo: false };
+  }
+}
+
+export function printFacturaFormal(params: {
+  factura: FacturaPrintData;
+  cliente: ClientePrintData | null;
+}): void {
+  const { factura, cliente } = params;
+  const estadoInfo = getEstadoFacturaInfo(factura.estado);
+  const fechaEmision = formatDate(factura.fecha ?? factura.created_at);
+  const subtotal = factura.subtotal ?? 0;
+  const descuento = factura.descuento ?? 0;
+  const itbisRate = factura.itbis ?? 0;
+  const subDesc = Math.max(0, subtotal - descuento);
+  const itbisAmount = subDesc * (itbisRate / 100);
+  const total = subDesc + itbisAmount;
+  const hasItbis = itbisRate > 0;
+  const hasDescuento = descuento > 0;
+
+  const itemsRows = (factura.items ?? [])
+    .map((item, idx) => {
+      const lineSubtotal = (item.cantidad ?? 0) * (item.precio_unitario ?? 0);
+      return `
+        <tr>
+          <td class="num">${idx + 1}</td>
+          <td>
+            <div class="service-desc">${escapeHtml(item.descripcion)}</div>
+          </td>
+          <td class="text-right">${item.cantidad}</td>
+          <td class="text-right">${formatCurrency(item.precio_unitario ?? 0)}</td>
+          <td class="text-right"><strong>${formatCurrency(lineSubtotal)}</strong></td>
+        </tr>`;
+    })
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Factura ${factura.numero} — ZOE Net Internet</title>
+<style>
+  @page { size: A4; margin: 1.5cm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #111827;
+    background: #fff;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px; }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #3B82F6;
+    margin-bottom: 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 28px; font-weight: 800;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  .brand-text { line-height: 1.2; }
+  .brand-name {
+    font-size: 22px; font-weight: 800; color: #1E40AF;
+    letter-spacing: -0.5px;
+  }
+  .brand-tag {
+    font-size: 11px; color: #6B7280;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-top: 2px;
+  }
+  .doc-meta { text-align: right; }
+  .doc-title { font-size: 24px; font-weight: 800; color: #111827; margin-bottom: 4px; }
+  .doc-numero {
+    font-family: 'Courier New', monospace;
+    font-size: 14px; color: #1E40AF; font-weight: 700;
+    background: #EFF6FF;
+    padding: 4px 10px; border-radius: 4px;
+    display: inline-block;
+  }
+  .doc-fecha { font-size: 11px; color: #9CA3AF; margin-top: 6px; }
+
+  /* CLIENTE */
+  .cliente-block {
+    background: #F9FAFB;
+    border-left: 3px solid #3B82F6;
+    padding: 14px 16px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+  .info-label {
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: #6B7280; margin-bottom: 6px;
+  }
+  .info-value { font-size: 15px; color: #111827; font-weight: 600; }
+  .info-sub { font-size: 11px; color: #6B7280; margin-top: 3px; }
+
+  /* TABLA DE ITEMS */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  .items-table thead th {
+    background: #1E40AF;
+    color: white;
+    padding: 11px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .items-table thead th.num { width: 32px; text-align: center; }
+  .items-table thead th.text-right { text-align: right; }
+  .items-table tbody td {
+    padding: 12px;
+    border-bottom: 1px solid #E5E7EB;
+    font-size: 13px;
+    vertical-align: top;
+  }
+  .items-table tbody td.num { color: #9CA3AF; font-weight: 600; text-align: center; }
+  .items-table tbody td.text-right {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+  .service-desc { font-weight: 600; color: #111827; }
+
+  /* TOTAL */
+  .totals {
+    margin-left: auto;
+    width: 320px;
+    margin-bottom: 24px;
+  }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .total-row.grand {
+    background: #1E40AF;
+    color: white;
+    border-radius: 6px;
+    padding: 14px;
+    margin-top: 8px;
+    font-size: 17px;
+    font-weight: 800;
+  }
+  .total-row .label { color: #4B5563; }
+  .total-row .value { font-family: 'Courier New', monospace; font-weight: 700; }
+  .total-row.grand .label, .total-row.grand .value { color: white; }
+  .total-row.discount .label, .total-row.discount .value { color: #DC2626; }
+
+  /* ESTADO */
+  .estado-banner {
+    text-align: center;
+    padding: 16px;
+    border-radius: 8px;
+    margin: 20px 0;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: white;
+    background: ${estadoInfo.color};
+  }
+
+  /* PAYMENT */
+  .payment-box {
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .payment-box h3 {
+    color: #92400E;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .payment-box p { font-size: 13px; color: #78350F; line-height: 1.7; }
+  .payment-box .account {
+    font-family: 'Courier New', monospace;
+    background: white; padding: 6px 10px; border-radius: 4px;
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 14px; letter-spacing: 1px;
+  }
+
+  /* NOTAS */
+  .notes-block {
+    background: #F0F9FF;
+    border-left: 3px solid #0EA5E9;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  .notes-block .info-label { color: #0369A1; }
+  .notes-block .info-value { color: #0C4A6E; font-size: 12px; font-weight: 400; line-height: 1.6; }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #E5E7EB;
+    text-align: center;
+    color: #9CA3AF;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .footer .thanks {
+    color: #1E40AF;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  /* ACTIONS — solo en pantalla */
+  .actions {
+    position: fixed;
+    top: 16px; right: 16px;
+    display: flex; gap: 8px;
+    z-index: 100;
+  }
+  .actions button {
+    background: #3B82F6;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-size: 14px;
+  }
+  .actions button.secondary {
+    background: white; color: #4B5563; border: 1px solid #D1D5DB;
+  }
+
+  @media print {
+    .actions { display: none !important; }
+    body { background: white; }
+    .container { padding: 0; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+  <div class="actions">
+    <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+    <button class="secondary" onclick="window.close()">Cerrar</button>
+  </div>
+
+  <div class="container">
+    <!-- HEADER -->
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">Z</div>
+        <div class="brand-text">
+          <div class="brand-name">ZOE NET</div>
+          <div class="brand-tag">Internet · República Dominicana</div>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <div class="doc-title">FACTURA</div>
+        <div class="doc-numero">${escapeHtml(factura.numero)}</div>
+        <div class="doc-fecha">Emitida: ${fechaEmision}</div>
+      </div>
+    </div>
+
+    <!-- CLIENTE -->
+    ${cliente ? `
+    <div class="cliente-block">
+      <div class="info-label">Facturar a</div>
+      <div class="info-value">${escapeHtml(cliente.nombre)} ${escapeHtml(cliente.apellido)}</div>
+      ${cliente.cedula ? `<div class="info-sub">Cédula: ${escapeHtml(cliente.cedula)}</div>` : ''}
+      ${cliente.telefono ? `<div class="info-sub">Tel: ${escapeHtml(cliente.telefono)}</div>` : ''}
+      ${cliente.email ? `<div class="info-sub">${escapeHtml(cliente.email)}</div>` : ''}
+      ${cliente.direccion ? `<div class="info-sub">${escapeHtml(cliente.direccion)}${cliente.localidad ? ', ' + escapeHtml(cliente.localidad) : ''}</div>` : (cliente.localidad ? `<div class="info-sub">${escapeHtml(cliente.localidad)}</div>` : '')}
+    </div>
+    ` : `
+    <div class="cliente-block">
+      <div class="info-label">Facturar a</div>
+      <div class="info-value" style="color: #9CA3AF; font-style: italic;">Cliente genérico</div>
+    </div>
+    `}
+
+    <!-- ITEMS -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Descripción</th>
+          <th class="text-right" style="width: 70px;">Cant.</th>
+          <th class="text-right" style="width: 110px;">Precio Unit.</th>
+          <th class="text-right" style="width: 120px;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows || `<tr><td colspan="5" style="text-align:center; color:#9CA3AF; padding:24px;">Sin items</td></tr>`}
+      </tbody>
+    </table>
+
+    <!-- TOTALES -->
+    <div class="totals">
+      <div class="total-row">
+        <span class="label">Subtotal</span>
+        <span class="value">${formatCurrency(subtotal)}</span>
+      </div>
+      ${hasDescuento ? `
+      <div class="total-row discount">
+        <span class="label">Descuento</span>
+        <span class="value">−${formatCurrency(descuento)}</span>
+      </div>` : ''}
+      ${hasItbis ? `
+      <div class="total-row">
+        <span class="label">ITBIS (${itbisRate}%)</span>
+        <span class="value">${formatCurrency(itbisAmount)}</span>
+      </div>` : `
+      <div class="total-row" style="color:#9CA3AF; font-style:italic;">
+        <span class="label">Sin ITBIS</span>
+        <span class="value">—</span>
+      </div>`}
+      <div class="total-row grand">
+        <span class="label">TOTAL</span>
+        <span class="value">${formatCurrency(total)}</span>
+      </div>
+    </div>
+
+    <!-- ESTADO -->
+    <div class="estado-banner">
+      ${estadoInfo.label}
+    </div>
+
+    <!-- PAGO (si pendiente/emitida/vencida) -->
+    ${estadoInfo.showPaymentInfo ? `
+    <div class="payment-box">
+      <h3>💳 Datos para realizar el pago</h3>
+      <p>
+        <strong>Banco:</strong> Banreservas<br>
+        <strong>Titular:</strong> Oscar Reyes<br>
+        <strong>Cuenta de Ahorro:</strong> <span class="account">9601205756</span><br>
+        <strong>Cuenta alternativa:</strong> <span class="account">02601381185</span>
+      </p>
+    </div>
+    ` : ''}
+
+    <!-- NOTAS -->
+    ${factura.notas ? `
+    <div class="notes-block">
+      <div class="info-label">Notas</div>
+      <div class="info-value">${escapeHtml(factura.notas).replace(/\n/g, '<br>')}</div>
+    </div>
+    ` : ''}
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="thanks">¡Gracias por confiar en ZOE Net Internet!</div>
+      <div>Para cualquier consulta, contáctanos al respaldo de esta factura.</div>
+      <div style="margin-top: 8px;">Generado el ${new Date().toLocaleString('es-DO')} · ZOE Net Gestión v1.6</div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 400);
+    });
+  </script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if (!win) {
+    alert('No se pudo abrir la ventana de impresión. Verifica que el navegador permita pop-ups.');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}

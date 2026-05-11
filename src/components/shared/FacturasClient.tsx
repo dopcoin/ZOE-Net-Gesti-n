@@ -15,13 +15,19 @@ import { formatCurrency, formatDate, estadoFacturaColor } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   Plus, X, FileText, Trash2, PlusCircle, Search, Package,
-  Calendar, Percent, Tag, AlertTriangle, Edit2,
+  Calendar, Percent, Tag, AlertTriangle, Edit2, Printer,
 } from 'lucide-react';
+import { printFacturaFormal } from '@/lib/print-factura';
 
 interface ClienteOption {
   id: string;
   nombre: string;
   apellido: string;
+  telefono?: string | null;
+  email?: string | null;
+  cedula?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
 }
 
 interface MercanciaOption {
@@ -413,6 +419,39 @@ export default function FacturasClient({ facturas: initial, clientes, mercancia 
   };
 
   // ---------- Delete ----------
+  // ---------- Imprimir / Exportar PDF ----------
+  const handleImprimirFactura = (factura: Factura & { clientes?: { nombre: string; apellido: string } }) => {
+    // Buscar datos completos del cliente
+    const cliente = factura.cliente_id ? clientes.find((c) => c.id === factura.cliente_id) : null;
+
+    printFacturaFormal({
+      factura: {
+        numero: factura.numero,
+        cliente_id: factura.cliente_id,
+        items: (factura.items ?? []) as FacturaItem[],
+        subtotal: factura.subtotal ?? 0,
+        descuento: factura.descuento ?? 0,
+        itbis: factura.itbis ?? 0,
+        total: factura.total ?? 0,
+        estado: factura.estado,
+        notas: factura.notas ?? null,
+        fecha: factura.fecha ?? null,
+        created_at: factura.created_at,
+      },
+      cliente: cliente
+        ? {
+            nombre: cliente.nombre,
+            apellido: cliente.apellido,
+            telefono: cliente.telefono,
+            email: cliente.email,
+            cedula: cliente.cedula,
+            direccion: cliente.direccion,
+            localidad: cliente.localidad,
+          }
+        : null,
+    });
+  };
+
   const handleDelete = async (factura: Factura) => {
     if (!window.confirm(`¿Eliminar factura ${factura.numero}?\nSi estaba pagada, se restaurará el stock.`)) return;
 
@@ -581,6 +620,13 @@ export default function FacturasClient({ facturas: initial, clientes, mercancia 
                     </td>
                     <td className="table-cell text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleImprimirFactura(f)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          title="Imprimir / Exportar PDF"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => openEdit(f)}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
@@ -909,17 +955,32 @@ export default function FacturasClient({ facturas: initial, clientes, mercancia 
               </div>
             </div>
 
-            <div className="sticky bottom-0 bg-surface border-t border-[#1F2937] px-5 py-4 flex items-center justify-end gap-3">
-              <button onClick={closeModal} className="btn-secondary">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={loading} className="btn-primary">
-                {loading
-                  ? 'Guardando...'
-                  : modalMode === 'create'
-                    ? 'Crear Factura'
-                    : 'Guardar Cambios'}
-              </button>
+            <div className="sticky bottom-0 bg-surface border-t border-[#1F2937] px-5 py-4 flex items-center justify-between gap-3">
+              {/* Imprimir factura — solo al editar (necesita el ID) */}
+              {modalMode === 'edit' && selectedFactura && (
+                <button
+                  type="button"
+                  onClick={() => handleImprimirFactura(selectedFactura as Factura & { clientes?: { nombre: string; apellido: string } })}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors"
+                  title="Generar factura imprimible / PDF para el cliente"
+                >
+                  <Printer size={14} />
+                  <span className="hidden sm:inline">Imprimir / PDF</span>
+                  <span className="inline sm:hidden">PDF</span>
+                </button>
+              )}
+              <div className="flex items-center gap-3 ml-auto">
+                <button onClick={closeModal} className="btn-secondary">
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={loading} className="btn-primary">
+                  {loading
+                    ? 'Guardando...'
+                    : modalMode === 'create'
+                      ? 'Crear Factura'
+                      : 'Guardar Cambios'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

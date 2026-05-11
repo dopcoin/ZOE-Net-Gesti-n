@@ -6,6 +6,27 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-05-11
+
+### Added
+- **Factura imprimible / PDF en `/facturas`** (extensión de v1.6.0):
+  - Nueva función `printFacturaFormal()` en `src/lib/print-factura.ts`
+  - Genera documento HTML profesional con marca ZOE Net (mismo design que instalaciones)
+  - Tabla de items numerada con columnas: # · Descripción · Cant. · Precio Unit. · Subtotal
+  - Desglose de totales: Subtotal → Descuento (en rojo, si > 0) → ITBIS (% o "Sin ITBIS") → TOTAL destacado
+  - Banner de estado con color por tipo:
+    - 🟢 PAGADA (verde) — sin info de pago
+    - 🟡 PENDIENTE (amarillo) — con datos bancarios
+    - 🔵 EMITIDA (azul) — con datos bancarios
+    - 🔴 VENCIDA (rojo) — con datos bancarios
+    - ⚪ ANULADA / CANCELADA (gris) — sin info de pago
+  - Datos completos del cliente (nombre, cédula, teléfono, email, dirección, localidad)
+  - Cuenta bancaria Banreservas / Oscar Reyes para que el cliente pague
+  - Auto-trigger de impresión al abrir → guardar como PDF
+- **Botón "🖨 Imprimir / PDF"** (icono `Printer` verde esmeralda) en cada fila de la tabla de facturas.
+- **Botón prominente "Imprimir / PDF"** en el footer del modal de edición (solo al editar factura existente).
+- Cliente completo se fetchea en `facturas/page.tsx` (teléfono, email, cédula, dirección, localidad) para la factura.
+
 ## [1.6.0] — 2026-04-30
 
 ### Added

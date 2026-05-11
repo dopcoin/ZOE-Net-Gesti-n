@@ -10,8 +10,8 @@ export default async function FacturasPage() {
     { data: clientes },
     { data: mercancia },
   ] = await Promise.all([
-    supabase.from('facturas').select('*, clientes(nombre, apellido)').order('created_at', { ascending: false }),
-    supabase.from('clientes').select('id, nombre, apellido').order('nombre'),
+    supabase.from('facturas').select('*, clientes(nombre, apellido, telefono, email, cedula, direccion, localidad)').order('created_at', { ascending: false }),
+    supabase.from('clientes').select('id, nombre, apellido, telefono, email, cedula, direccion, localidad').order('nombre'),
     supabase.from('mercancia').select('id, nombre, precio_venta, stock, activo').eq('activo', true).order('nombre'),
   ]);
 
