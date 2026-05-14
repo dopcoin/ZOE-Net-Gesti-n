@@ -9,7 +9,9 @@ import {
 import {
   TrendingUp, TrendingDown, Percent, Users, AlertTriangle,
   PiggyBank, Activity, Wallet, Target, ShoppingCart, Download, Crown,
+  BarChart3, FileBarChart,
 } from 'lucide-react';
+import FinanzasContable from './FinanzasContable';
 
 interface LibroEntry {
   id: string;
@@ -114,19 +116,25 @@ export default function FinanzasClient({
   libroDiario, cobros, clientes, ventas, gananciasRevendedores, currentMonth, currentYear,
 }: Props) {
   const [periodo, setPeriodo] = useState<'mes' | 'trimestre' | 'anio'>('mes');
+  const [vista, setVista] = useState<'resumen' | 'contable'>('resumen');
 
   // === Rango de fechas según período ===
-  const { rangeStart, rangeLabel } = useMemo(() => {
+  const { rangeStart, rangeLabel, rangeStartISO, rangeEndISO } = useMemo(() => {
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
     if (periodo === 'mes') {
       const start = new Date(currentYear, currentMonth - 1, 1);
-      return { rangeStart: start, rangeLabel: `${meses[currentMonth - 1]} ${currentYear}` };
+      const end = new Date(currentYear, currentMonth, 0);
+      return { rangeStart: start, rangeLabel: `${meses[currentMonth - 1]} ${currentYear}`, rangeStartISO: fmt(start), rangeEndISO: fmt(end) };
     }
     if (periodo === 'trimestre') {
       const q = Math.floor((currentMonth - 1) / 3);
       const start = new Date(currentYear, q * 3, 1);
-      return { rangeStart: start, rangeLabel: `Q${q + 1} ${currentYear}` };
+      const end = new Date(currentYear, q * 3 + 3, 0);
+      return { rangeStart: start, rangeLabel: `Q${q + 1} ${currentYear}`, rangeStartISO: fmt(start), rangeEndISO: fmt(end) };
     }
-    return { rangeStart: new Date(currentYear, 0, 1), rangeLabel: `Año ${currentYear}` };
+    const start = new Date(currentYear, 0, 1);
+    const end = new Date(currentYear, 11, 31);
+    return { rangeStart: start, rangeLabel: `Año ${currentYear}`, rangeStartISO: fmt(start), rangeEndISO: fmt(end) };
   }, [periodo, currentMonth, currentYear]);
 
   // === KPIs financieros del período ===
@@ -333,6 +341,49 @@ export default function FinanzasClient({
         Período: <span className="text-gray-300 font-semibold">{rangeLabel}</span>
       </div>
 
+      {/* ============ TOGGLE DE VISTA ============ */}
+      <div className="flex rounded-xl bg-[#1C2333] border border-[#1F2937] p-1">
+        <button
+          onClick={() => setVista('resumen')}
+          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            vista === 'resumen'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <BarChart3 size={16} />
+          <span>Resumen Ejecutivo</span>
+        </button>
+        <button
+          onClick={() => setVista('contable')}
+          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            vista === 'contable'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <FileBarChart size={16} />
+          <span>Análisis Contable</span>
+        </button>
+      </div>
+
+      {/* ============ VISTA: Análisis Contable ============ */}
+      {vista === 'contable' && (
+        <FinanzasContable
+          libroDiario={libroDiario}
+          ventas={ventas}
+          cobros={cobros}
+          gananciasRevendedores={gananciasRevendedores}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          rangeStart={rangeStartISO}
+          rangeEnd={rangeEndISO}
+          rangeLabel={rangeLabel}
+        />
+      )}
+
+      {/* ============ VISTA: Resumen Ejecutivo (contenido existente) ============ */}
+      {vista === 'resumen' && (<>
       {/* ============ KPIs PRINCIPALES ============ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="kpi-card kpi-card-income">
@@ -743,6 +794,8 @@ export default function FinanzasClient({
           </div>
         </div>
       </div>
+      </>)}
+      {/* Fin de vista 'resumen' */}
     </div>
   );
 }

@@ -6,6 +6,68 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-05-11
+
+### Added — Análisis Contable Profesional en `/finanzas`
+
+Sprint de inteligencia financiera. La página `/finanzas` ahora tiene un toggle prominente entre dos vistas:
+- **Resumen Ejecutivo** (el contenido original con KPIs, aging, top clientes, etc.)
+- **Análisis Contable** (NUEVO — 4 sub-secciones profesionales)
+
+#### 📊 Estado de Resultados (P&L)
+Tabla estructurada estilo contable formal con desglose completo:
+- **INGRESOS BRUTOS** desglosados por línea contable:
+  - Cobros (Internet) — recurrentes
+  - Ventas de Equipos
+  - Instalaciones
+  - Facturas
+  - Otros Ingresos
+- **COSTOS DIRECTOS (COGS)** — Costo de mercancía vendida calculado de `ventas.total − ventas.ganancia`
+- **UTILIDAD BRUTA** + Margen Bruto %
+- **GASTOS OPERATIVOS** por categoría (Nóminas, Mantenimientos, Viáticos, Servicios, Equipos, Suministros, Otros)
+- **UTILIDAD OPERATIVA** + Margen Operativo %
+- **UTILIDAD NETA** destacada con color por signo (verde positivo / rojo negativo)
+- Aviso de **comisiones a revendedores pendientes** como pasivo no operativo (no impacta el P&L hasta liquidarse)
+- Cada línea muestra: Monto · # de transacciones · % del ingreso bruto
+- **Export CSV** del Estado de Resultados completo
+
+#### 💵 Composición por Método de Pago
+- **6 métodos normalizados**: Efectivo · Transferencia · Cheque · Tarjeta · Depósito · Otro
+- **Detección inteligente de cheques** en cualquier registro cuyo "recibido_en" contenga "cheque" o "DopCoin" (aunque esté guardado como transferencia)
+- **Cards visuales** por método con icono, monto, % y conteo de movimientos
+- **Pie chart** de distribución de ingresos
+- **Tabla** con: Método · Ingreso · Egreso · % del total
+- **Export CSV** con desglose completo
+
+#### 📅 Análisis Temporal por Mes × Método
+- **Stacked bar chart** mensual de últimos 12 meses con barras divididas por método de pago
+- **Heatmap mes × método** con intensidad de color proporcional al monto:
+  - Cada celda colorea según el método (verde efectivo, azul transferencia, púrpura cheque, etc.)
+  - Intensidad de la celda proporcional al monto vs el máximo del rango
+  - Totales por mes al final de cada fila
+- Permite ver de un vistazo: estacionalidad, cambios de comportamiento de pago, meses anómalos
+
+#### 🎯 Métricas Financieras Ejecutivas
+- **Márgenes**: Bruto, Operativo, Neto con barras de progreso
+- **Ratios operativos**:
+  - Gastos / Ingresos (con interpretación: Saludable <50% / Aceptable / Alto)
+  - Costo / Ventas (COGS sobre ventas brutas)
+  - Concentración Top 5 clientes (alerta si >60%)
+  - Tasa de Cobranza
+- **Salud Financiera**:
+  - Burn Rate Mensual (promedio de egresos de últimos 6 meses con actividad)
+  - Cobertura Operativa (utilidad operativa / burn rate, en meses)
+- **Análisis Ejecutivo Auto-generado** — 5 bullets con interpretación textual:
+  - Rentabilidad
+  - Estructura de ingresos (% recurrente vs ventas)
+  - Concentración de riesgo
+  - Eficiencia operativa
+  - Composición de pagos
+
+### Changed
+- `FinanzasClient.tsx` ahora calcula `rangeStartISO` y `rangeEndISO` en formato YYYY-MM-DD para compatibilidad con el nuevo módulo contable.
+- Header con toggle visual prominente entre las 2 vistas (Resumen / Contable).
+
 ## [1.6.1] — 2026-05-11
 
 ### Added
