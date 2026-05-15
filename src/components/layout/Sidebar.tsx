@@ -135,30 +135,37 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed top-0 left-0 h-full bg-[#111827] border-r border-[#1F2937] z-50 transition-all duration-300 flex flex-col
+        className={`fixed top-0 left-0 h-full z-50 transition-all duration-300 flex flex-col backdrop-blur-xl
           ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
           w-[85vw] max-w-[320px] lg:w-64
-          ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}`}
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          background: 'rgba(11, 15, 25, 0.75)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+          boxShadow: sidebarOpen ? '0 0 40px rgba(168, 85, 247, 0.15)' : 'none',
+        }}
       >
         {/* Logo + collapse */}
-        <div className="flex items-center justify-between p-4 border-b border-[#1F2937] flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-white/[0.06] flex-shrink-0">
           {!sidebarCollapsed && (
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shadow-blue-500/20">
-                <span className="text-white font-bold text-sm">Z</span>
+            <Link href="/dashboard" className="flex items-center gap-2 group">
+              <div className="w-9 h-9 rounded-xl holo-logo flex items-center justify-center">
+                <span className="text-white font-bold text-base">Z</span>
               </div>
               <div>
-                <div className="text-sm font-bold text-white leading-tight">
-                  <span className="text-blue-400">ZOE</span> Net
+                <div className="text-sm font-bold leading-tight">
+                  <span className="text-gradient-iri animate-gradient font-extrabold">ZOE</span>
+                  <span className="text-white"> Net</span>
                 </div>
                 <div className="text-[9px] text-gray-500 leading-none uppercase tracking-widest">Gestión</div>
               </div>
             </Link>
           )}
           {sidebarCollapsed && (
-            <Link href="/dashboard" className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shadow-blue-500/20 mx-auto">
-              <span className="text-white font-bold text-sm">Z</span>
+            <Link href="/dashboard" className="w-9 h-9 rounded-xl holo-logo flex items-center justify-center mx-auto">
+              <span className="text-white font-bold text-base">Z</span>
             </Link>
           )}
           <button
@@ -177,11 +184,15 @@ export default function Sidebar() {
           {filteredGroups.map((group) => (
             <div key={group.id} className="space-y-0.5">
               {!sidebarCollapsed && (
-                <div className="px-3 pb-1 pt-1 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+                <div className="px-3 pb-1 pt-1 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.3))' }} />
                   {group.label}
+                  <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, rgba(168, 85, 247, 0.3), transparent)' }} />
                 </div>
               )}
-              {sidebarCollapsed && <div className="h-px bg-[#1F2937] mx-2 my-2 hidden lg:block" />}
+              {sidebarCollapsed && (
+                <div className="h-px mx-2 my-2 hidden lg:block" style={{ background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)' }} />
+              )}
               {group.items.map((item) => {
                 const active = pathname === item.href;
                 const isTareas = item.href === '/tareas';
@@ -200,7 +211,13 @@ export default function Sidebar() {
                     title={sidebarCollapsed ? item.label : undefined}
                   >
                     {active && !sidebarCollapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-400 rounded-r-full" />
+                      <span
+                        className="absolute -left-px top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
+                        style={{
+                          background: 'linear-gradient(180deg, #60A5FA, #A855F7)',
+                          boxShadow: '0 0 12px rgba(168, 85, 247, 0.6)',
+                        }}
+                      />
                     )}
                     <span className="relative flex-shrink-0">
                       <Icon size={18} />
@@ -223,25 +240,31 @@ export default function Sidebar() {
           {!sidebarCollapsed && (
             <>
               <div className="p-3 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/30 to-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                  style={{
+                    background: 'linear-gradient(135deg, #3B82F6, #A855F7)',
+                    boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 16px rgba(168, 85, 247, 0.3)',
+                  }}
+                >
                   {profile?.nombre?.[0]}{profile?.apellido?.[0]}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-gray-300 truncate">
+                  <div className="text-xs text-gray-200 truncate font-semibold">
                     {profile?.nombre} {profile?.apellido}
                   </div>
                   <div className="text-[10px] text-gray-500 capitalize">{profile?.rol}</div>
                 </div>
               </div>
-              <div className="px-3 py-2 border-t border-[#1F2937] flex items-center justify-between">
-                <span className="text-[10px] text-gray-600 font-mono">v{APP_VERSION}</span>
-                <span className="text-[10px] text-gray-600">© ZOE Net</span>
+              <div className="px-3 py-2 flex items-center justify-between border-t border-white/[0.05]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded badge-neon">v{APP_VERSION}</span>
+                <span className="text-[9px] text-gray-600 uppercase tracking-widest">© ZOE Net</span>
               </div>
             </>
           )}
           {sidebarCollapsed && (
             <div className="py-2 text-center">
-              <span className="text-[9px] text-gray-600 font-mono">v{APP_VERSION}</span>
+              <span className="text-[9px] text-purple-300/70 font-mono">v{APP_VERSION}</span>
             </div>
           )}
         </div>

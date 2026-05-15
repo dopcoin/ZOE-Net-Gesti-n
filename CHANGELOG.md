@@ -6,6 +6,70 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-05-11
+
+### Added — Estética Web 3.0 / Futurista
+
+Overhaul visual completo manteniendo retro-compatibilidad con todas las clases existentes (`.card`, `.btn-primary`, `.kpi-card`, etc.). El mismo HTML se ve infinitamente mejor.
+
+#### 🎨 Design System v3
+- **Mesh gradient background** animado a nivel `body` con radial-gradients de azul/púrpura/cyan/pink que se desplazan suavemente (animación de 24s).
+- **Tipografía futurista**: agregada **Space Grotesk** para headings (h1-h4) con `letter-spacing: -0.02em`. Inter sigue como body. JetBrains Mono para números.
+- **Tokens de design** en CSS custom properties:
+  - Acentos neón: `--neon-cyan`, `--neon-purple`, `--neon-pink`, `--neon-blue`, `--neon-green`, `--neon-amber`
+  - Gradientes: `--gradient-primary` (azul→púrpura→pink), `--gradient-accent` (cyan→púrpura), `--gradient-iridescent` (5 colores)
+  - Glass tokens: `--glass-bg`, `--glass-border` con valores hi para hover
+
+#### 🪟 Glassmorphism
+- **Todas las `.card`** ahora usan `backdrop-blur-md` + transparencia + borde sutil con `inset highlight`
+- **`.kpi-card`** rediseñado: rounded-2xl, glass effect, glow line arriba con color por categoría (verde/rojo/azul/púrpura)
+- **Modal-content** ahora con `backdrop-blur-xl` + borde gradient suave + `box-shadow` con tinte púrpura
+
+#### 💫 Glow effects y gradientes
+- **`.holo-logo`**: logo Z con gradient animado (azul→púrpura→pink) + shadow neón
+- Texto **`.text-gradient`** y **`.text-gradient-iri`** (iridiscente animado)
+- **Glows**: `.glow-blue`, `.glow-purple`, `.glow-cyan`, `.glow-pink`, `.glow-emerald`
+- **`.gradient-border`** real con técnica de padding-box (sin trucos hackeados)
+- **`.badge-neon`** con gradient azul-púrpura + glow púrpura
+- **Selection** con púrpura translúcido
+
+#### 🎬 Animaciones
+- `gradientShift` 6s — para gradientes animados
+- `shimmer` — en `.progress-fill` para barras de progreso con brillo móvil
+- `pulseGlow` — ahora con box-shadow expandiéndose en púrpura
+- `scanMove` — para `.scanline` (overlay sutil)
+- `float` — flotación suave
+
+#### 🧭 Sidebar
+- Background semi-transparente con `backdrop-blur-xl` (rgba 0.75)
+- Logo "Z" con efecto holográfico (gradient animado + glow púrpura)
+- Texto "ZOE" del título usa gradient iridiscente animado
+- **Items activos**: gradient azul-púrpura + borde izquierdo con glow neón
+- **Labels de grupos** con líneas gradient a ambos lados
+- **Avatar de usuario** circular con gradient azul-púrpura + glow
+- **Badge de versión** con gradient (clase `.badge-neon`)
+
+#### 📱 Header & Bottom Nav
+- Header: background translúcido + borde con tinte púrpura sutil + shadow glow
+- Bottom nav: backdrop-blur-xl + indicador activo con gradient azul-púrpura glowing
+- Avatar header con gradient
+
+#### 🎨 Botones
+- **`.btn-primary`** ahora gradient azul-índigo con overlay púrpura on hover + glow on hover + `translateY(-1px)`
+- **`.btn-secondary`** glassmorphism semi-transparente
+- **`.btn-danger`** con borde rojo + glow on hover
+- **`.fab`** con gradient + glow púrpura
+
+#### 🏷 Badges
+- Todas las variantes (`badge-success`, `badge-warning`, etc.) con borde semi-transparente + box-shadow glow del color
+- Nuevo `.badge-neon` para versión y elementos especiales
+
+#### 📊 Aging buckets
+- Cada bucket con borde de color + `inset box-shadow` que crea efecto de "luz interna"
+
+#### ♿ Accesibilidad
+- Respeta `prefers-reduced-motion` — desactiva todas las animaciones para usuarios que lo prefieren
+
 ## [1.7.0] — 2026-05-11
 
 ### Added — Análisis Contable Profesional en `/finanzas`

@@ -45,8 +45,13 @@ export default function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-30 bg-[#111827]/90 backdrop-blur-lg border-b border-[#1F2937] transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      className={`sticky top-0 z-30 backdrop-blur-xl transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        background: 'rgba(11, 15, 25, 0.7)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        boxShadow: '0 1px 0 rgba(168, 85, 247, 0.1)',
+      }}
     >
       <div className="flex items-center justify-between px-3 sm:px-4 h-14">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -82,7 +87,7 @@ export default function Header() {
 
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {/* Version badge — visible en desktop */}
-          <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-md bg-[#1C2333] border border-[#1F2937] text-[10px] font-mono text-gray-500">
+          <span className="hidden md:inline-flex items-center badge-neon text-[10px] font-mono">
             v{APP_VERSION}
           </span>
 
@@ -96,7 +101,13 @@ export default function Header() {
           <div className="w-px h-6 bg-[#1F2937] mx-1 hidden sm:block" />
 
           <div className="flex items-center gap-1.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/30 to-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+              style={{
+                background: 'linear-gradient(135deg, #3B82F6, #A855F7)',
+                boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 12px rgba(168, 85, 247, 0.3)',
+              }}
+            >
               {profile?.nombre?.[0]}{profile?.apellido?.[0]}
             </div>
             <button
