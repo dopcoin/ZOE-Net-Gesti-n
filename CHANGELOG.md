@@ -6,6 +6,13 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.8.1] — 2026-05-11 — 🚨 HOTFIX BUILD BLOQUEADO
+
+### Fixed
+- **Build de Vercel fallaba desde v1.5.0** — quitados dos comentarios `// eslint-disable-next-line @typescript-eslint/no-use-before-define` en `CobrosClient.tsx` (líneas 87 y 103) que referenciaban un plugin de ESLint no instalado en el proyecto.
+- Esto causaba que TODAS las features visuales agregadas desde v1.5.0 (bulk pagos, WhatsApp, factura PDF, P&L contable, **Web 3.0 visual**) NO se vieran en producción aunque los commits se pushearan a GitHub.
+- A partir de este release, Vercel auto-deploya correctamente y los cambios desde v1.5.0 hasta v1.8.0 aparecerán todos juntos.
+
 ## [1.8.0] — 2026-05-11
 
 ### Added — Estética Web 3.0 / Futurista

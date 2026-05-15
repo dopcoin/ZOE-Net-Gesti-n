@@ -84,7 +84,6 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
   }
   function selectAllPendientes() {
     const pendientesIds = new Set(
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       filtered
         .filter((cc) => cc.estado === 'pendiente' || cc.estado === 'mora')
         .map((cc) => cc.cliente.id)
@@ -100,7 +99,6 @@ export default function CobrosClient({ clientes, cobros, recibidosPor: initialRe
     setBulkSaving(true);
     let exitos = 0, errores = 0;
 
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     const seleccionados = filtered.filter((cc) => selectedIds.has(cc.cliente.id));
 
     for (const cc of seleccionados) {
