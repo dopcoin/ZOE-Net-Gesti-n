@@ -24,9 +24,28 @@ interface FormData {
   stock_minimo: string;
   activo: boolean;
   fecha_entrada: string;
+  // Vinculación con gasto en libro_diario
+  registrar_gasto: boolean;       // toggle
+  gasto_metodo_pago: string;
+  gasto_recibido_en: string;       // beneficiario / proveedor
+  gasto_referencia: string;
+  gasto_categoria: string;         // por defecto "Equipos"
+  gasto_descripcion: string;       // auto-llenada
+}
+
+interface GastoVinculado {
+  id: string;
+  fecha: string | null;
+  monto: number;
+  categoria: string;
+  descripcion: string;
+  metodo_pago: string | null;
+  recibido_en: string | null;
+  referencia: string | null;
 }
 
 const todayISO = () => new Date().toISOString().split('T')[0];
+const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Depósito', 'Otro'];
 
 const emptyForm: FormData = {
   nombre: '',
@@ -38,6 +57,12 @@ const emptyForm: FormData = {
   stock_minimo: '',
   activo: true,
   fecha_entrada: todayISO(),
+  registrar_gasto: false,
+  gasto_metodo_pago: 'Efectivo',
+  gasto_recibido_en: '',
+  gasto_referencia: '',
+  gasto_categoria: 'Equipos',
+  gasto_descripcion: '',
 };
 
 export default function InventarioClient({ mercancia: initialMercancia, categorias, canEdit = true }: Props) {
@@ -47,6 +72,9 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
   const [modal, setModal] = useState<{ open: boolean; mode: 'create' | 'edit'; id?: string }>({ open: false, mode: 'create' });
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [loading, setLoading] = useState(false);
+  // Gastos vinculados al producto que se está editando
+  const [gastosVinculados, setGastosVinculados] = useState<GastoVinculado[]>([]);
+  const [loadingGastos, setLoadingGastos] = useState(false);
 
   // Escape key handler and body overflow cleanup
   useEffect(() => {
@@ -119,12 +147,14 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
 
   // --- Modal helpers ---
   const openCreate = () => {
-    setFormData(emptyForm);
+    setFormData({ ...emptyForm, registrar_gasto: true }); // Por defecto activo al crear
+    setGastosVinculados([]);
     setModal({ open: true, mode: 'create' });
   };
 
-  const openEdit = (item: Mercancia) => {
+  const openEdit = async (item: Mercancia) => {
     setFormData({
+      ...emptyForm,
       nombre: item.nombre,
       descripcion: item.descripcion || '',
       categoria_id: item.categoria_id || '',
@@ -134,13 +164,35 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       stock_minimo: String(item.stock_minimo),
       activo: item.activo,
       fecha_entrada: item.fecha_entrada || (item.created_at ? item.created_at.split('T')[0] : todayISO()),
+      // Al editar, por defecto NO crear nuevo gasto (solo actualizar el producto)
+      registrar_gasto: false,
     });
     setModal({ open: true, mode: 'edit', id: item.id });
+
+    // Cargar historial de gastos vinculados
+    setLoadingGastos(true);
+    setGastosVinculados([]);
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('libro_diario')
+        .select('id, fecha, monto, categoria, descripcion, metodo_pago, recibido_en, referencia')
+        .eq('origen_id', item.id)
+        .eq('origen_tipo', 'mercancia')
+        .order('fecha', { ascending: false });
+      if (data) setGastosVinculados(data);
+    } catch (e) {
+      console.warn('[gastos vinculados]', e);
+    } finally {
+      setLoadingGastos(false);
+    }
   };
 
   const closeModal = () => {
     setModal({ open: false, mode: 'create' });
     setFormData(emptyForm);
+    setGastosVinculados([]);
   };
 
   // --- CRUD ---
@@ -164,6 +216,8 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
       fecha_entrada: formData.fecha_entrada || todayISO(),
     };
 
+    let productoId: string | null = modal.id ?? null;
+
     if (modal.mode === 'create') {
       const result = await createMercancia(payload);
       if (result.error) {
@@ -171,7 +225,7 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
         setLoading(false);
         return;
       }
-      // Optimistic: refresh will pick up the new item with relations
+      productoId = result.data?.id ?? null;
       toast.success('Producto creado exitosamente');
     } else {
       const result = await updateMercancia(modal.id!, payload);
@@ -181,6 +235,38 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
         return;
       }
       toast.success('Producto actualizado exitosamente');
+    }
+
+    // === Registrar gasto vinculado en libro_diario ===
+    if (formData.registrar_gasto && productoId && payload.stock > 0 && payload.precio_compra > 0) {
+      try {
+        const { createRegistroDiario } = await import('@/lib/services');
+        const montoGasto = payload.stock * payload.precio_compra;
+        const descGasto = formData.gasto_descripcion.trim() ||
+          `Compra inventario: ${payload.stock}× ${payload.nombre} @ ${payload.precio_compra.toFixed(2)}`;
+
+        const gastoResult = await createRegistroDiario({
+          fecha: formData.fecha_entrada || todayISO(),
+          tipo: 'egreso',
+          categoria: formData.gasto_categoria.trim() || 'Equipos',
+          descripcion: descGasto,
+          monto: montoGasto,
+          referencia: formData.gasto_referencia.trim() || null,
+          metodo_pago: formData.gasto_metodo_pago || null,
+          recibido_en: formData.gasto_recibido_en.trim() || null,
+          origen_id: productoId,
+          origen_tipo: 'mercancia',
+        });
+
+        if (gastoResult.error) {
+          toast.warning(`Producto guardado, pero falló registrar el gasto: ${gastoResult.error.message}`);
+        } else {
+          toast.success(`Gasto de ${new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(montoGasto)} vinculado en Libro Diario`);
+        }
+      } catch (e) {
+        console.warn('[gasto vinculado]', e);
+        toast.warning('Producto guardado, pero falló registrar el gasto vinculado');
+      }
     }
 
     // Re-fetch items to get proper relations
@@ -743,6 +829,191 @@ export default function InventarioClient({ mercancia: initialMercancia, categori
                   />
                 </button>
               </div>
+
+              {/* ====== VINCULACIÓN CON GASTO ====== */}
+              <div className="border-t border-[#1F2937] pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💰</span>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-200">
+                        Registrar como gasto en Libro Diario
+                      </label>
+                      <p className="text-[11px] text-gray-500">
+                        {modal.mode === 'create'
+                          ? 'Crea un egreso vinculado a este producto'
+                          : 'Registra una compra adicional (reabastecimiento)'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateField('registrar_gasto', !formData.registrar_gasto)}
+                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                      formData.registrar_gasto ? 'bg-emerald-600' : 'bg-[#1C2333] border border-[#1F2937]'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                        formData.registrar_gasto ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {formData.registrar_gasto && (
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                    {/* Total a registrar */}
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <span className="text-xs text-gray-300">Total a registrar como gasto:</span>
+                      <span className="text-lg font-bold font-mono tabular text-emerald-400">
+                        {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' })
+                          .format((parseInt(formData.stock) || 0) * (parseFloat(formData.precio_compra) || 0))}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      = {parseInt(formData.stock) || 0} unidades × {' '}
+                      {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' })
+                        .format(parseFloat(formData.precio_compra) || 0)} por unidad
+                    </p>
+
+                    {/* Categoría + Método de pago */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Categoría del gasto</label>
+                        <select
+                          value={formData.gasto_categoria}
+                          onChange={(e) => updateField('gasto_categoria', e.target.value)}
+                          className="input"
+                        >
+                          <option value="Equipos">Equipos</option>
+                          <option value="Suministros">Suministros</option>
+                          <option value="Mantenimientos">Mantenimientos</option>
+                          <option value="Servicios">Servicios</option>
+                          <option value="Otros">Otros</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">Método de pago</label>
+                        <select
+                          value={formData.gasto_metodo_pago}
+                          onChange={(e) => updateField('gasto_metodo_pago', e.target.value)}
+                          className="input"
+                        >
+                          {METODOS_PAGO.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Beneficiario + Referencia */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Proveedor / Pagado a</label>
+                        <input
+                          type="text"
+                          value={formData.gasto_recibido_en}
+                          onChange={(e) => updateField('gasto_recibido_en', e.target.value)}
+                          className="input"
+                          placeholder="Nombre del proveedor..."
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Referencia</label>
+                        <input
+                          type="text"
+                          value={formData.gasto_referencia}
+                          onChange={(e) => updateField('gasto_referencia', e.target.value)}
+                          className="input"
+                          placeholder="Factura, cheque..."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Descripción opcional */}
+                    <div>
+                      <label className="label">Descripción <span className="text-gray-600">(opcional)</span></label>
+                      <input
+                        type="text"
+                        value={formData.gasto_descripcion}
+                        onChange={(e) => updateField('gasto_descripcion', e.target.value)}
+                        className="input"
+                        placeholder={`Auto: "Compra inventario: ${formData.stock || 'N'}× ${formData.nombre || 'producto'}..."`}
+                      />
+                    </div>
+
+                    <p className="text-[11px] text-emerald-400/80 flex items-start gap-1">
+                      <span>✓</span>
+                      <span>Se creará una entrada de <strong>egreso</strong> en el Libro Diario vinculada a este producto.
+                        Aparecerá también en <strong>/gastos</strong>.</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* ====== HISTORIAL DE GASTOS VINCULADOS (solo edición) ====== */}
+              {modal.mode === 'edit' && (
+                <div className="border-t border-[#1F2937] pt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-base">📜</span>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-200">
+                        Historial de compras vinculadas
+                      </label>
+                      <p className="text-[11px] text-gray-500">
+                        Gastos en Libro Diario asociados a este producto
+                      </p>
+                    </div>
+                  </div>
+
+                  {loadingGastos ? (
+                    <div className="text-xs text-gray-500 py-4 text-center">Cargando...</div>
+                  ) : gastosVinculados.length === 0 ? (
+                    <div className="text-xs text-gray-500 italic py-4 text-center rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                      Sin gastos vinculados.{' '}
+                      {(parseInt(formData.stock) || 0) > 0 && (parseFloat(formData.precio_compra) || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => updateField('registrar_gasto', true)}
+                          className="text-emerald-400 hover:text-emerald-300 underline"
+                        >
+                          Registrar uno ahora ↑
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                        {gastosVinculados.map((g) => (
+                          <div key={g.id} className="flex items-center justify-between p-2.5 rounded-lg bg-[#1C2333]/40 border border-[#1F2937] text-xs">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-gray-200 truncate">{g.descripcion}</div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">
+                                {g.fecha ? formatDate(g.fecha) : '—'}
+                                {g.metodo_pago && <span> · {g.metodo_pago}</span>}
+                                {g.recibido_en && <span> · {g.recibido_en}</span>}
+                                {g.referencia && <span> · Ref: {g.referencia}</span>}
+                              </div>
+                            </div>
+                            <span className="text-sm font-bold font-mono tabular text-red-400 ml-3 flex-shrink-0">
+                              −{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(g.monto)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between mt-2 px-2 text-[11px]">
+                        <span className="text-gray-500">{gastosVinculados.length} compra{gastosVinculados.length !== 1 ? 's' : ''}</span>
+                        <span className="text-gray-300">
+                          Total invertido:{' '}
+                          <span className="font-bold text-red-400 font-mono tabular">
+                            {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' })
+                              .format(gastosVinculados.reduce((s, g) => s + g.monto, 0))}
+                          </span>
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1F2937]">

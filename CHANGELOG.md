@@ -6,6 +6,47 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-05-15
+
+### Added — Vinculación Inventario ↔ Libro Diario
+
+Flujo contable correcto: cuando agregas producto al inventario, ahora puedes registrar el gasto vinculado automáticamente.
+
+#### En `/inventario` — al crear o editar producto
+- **Toggle "Registrar como gasto en Libro Diario"** (verde, activado por defecto al crear, desactivado al editar)
+- Al activarlo se despliega un panel inline con:
+  - **Total a registrar** calculado automáticamente: `stock × precio_compra` con color esmeralda
+  - **Categoría del gasto** (Equipos / Suministros / Mantenimientos / Servicios / Otros) — default "Equipos"
+  - **Método de pago** (Efectivo / Transferencia / Tarjeta / Cheque / Depósito / Otro)
+  - **Proveedor / Pagado a** — campo de texto libre
+  - **Referencia** — factura, cheque, etc.
+  - **Descripción** opcional con placeholder auto-generado
+- Al guardar:
+  - Crea/actualiza el producto en `mercancia`
+  - Inserta entrada en `libro_diario` con `tipo='egreso'`, `origen_id=producto.id`, `origen_tipo='mercancia'`
+  - Toast confirma con el monto formateado
+  - El gasto aparece automáticamente en `/gastos` y `/libro-diario`
+
+#### En `/inventario` — al editar producto existente
+- Nueva sección **"📜 Historial de compras vinculadas"** que muestra:
+  - Lista cronológica de todos los gastos vinculados al producto (descripción, fecha, método, beneficiario, referencia)
+  - **Total invertido** acumulado del producto
+- Si no hay historial: mensaje con CTA "Registrar uno ahora ↑" que activa el toggle
+- Permite registrar **reabastecimientos**: cada vez que recompras stock se crea un nuevo gasto vinculado (no se sobrescribe el anterior)
+
+#### En `/libro-diario`
+- Nueva etiqueta para `origen_tipo='mercancia'` → muestra badge **"🔗 Inventario"**
+- Al eliminar una entrada vinculada al inventario: **NO** elimina el producto (sería destructivo) — solo desvincula la entrada del libro diario y conserva el producto y su stock
+
+#### En `/gastos`
+- Las entradas con `origen_tipo='mercancia'` se muestran como gastos normales (ya funcionaba por la query `tipo='egreso'`)
+- Pendiente próxima iteración: badge específico "📦 Producto" + link clicable al producto
+
+### Changed
+- `InventarioClient.tsx`: `openEdit()` ahora es `async` y carga el historial de gastos vinculados al abrir el modal
+- `handleSubmit` extiende el flujo: producto → (si toggle activo) → crea gasto vinculado via `createRegistroDiario` con `origen_id/origen_tipo`
+- `closeModal` limpia también el estado de gastos vinculados
+
 ## [1.8.1] — 2026-05-11 — 🚨 HOTFIX BUILD BLOQUEADO
 
 ### Fixed

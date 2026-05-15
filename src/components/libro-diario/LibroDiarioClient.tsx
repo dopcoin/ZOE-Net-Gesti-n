@@ -25,6 +25,7 @@ const origenLabel: Record<string, string> = {
   venta: 'Venta',
   instalacion: 'Instalación',
   factura: 'Factura',
+  mercancia: 'Inventario',
 };
 
 const emptyForm = {
@@ -305,6 +306,10 @@ export default function LibroDiarioClient({ registros: initialRegistros, categor
             .update({ estado: 'pendiente', fecha_pago: null, tipo_pago: null })
             .eq('id', r.origen_id);
           actionMsg = 'Cobro revertido a pendiente';
+        } else if (r.origen_tipo === 'mercancia') {
+          // Para inventario: NO eliminamos el producto (perderíamos histórico de stock).
+          // Solo se borra esta entrada del libro diario.
+          actionMsg = 'Gasto desvinculado del producto (producto conservado)';
         }
 
         toast.success(`Registro eliminado — ${actionMsg}`);
